@@ -2,8 +2,8 @@
 
 ###### Table of Contents
 
-1. [🧑‍🏫 **Rationale**](#1-rationale)
-2. [🧐 **Overview**](#2-overview)
+1. [🧑‍🏫 **Rationale**](#1-rationale-)
+2. [🧐 **Overview**](#2-overview-)
     - [Defining a _paramclass_](#defining-a-paramclass)
     - [Protecting attributes with `@protected`](#protecting-attributes-with-protected)
     - [Seamless attributes interactions](#seamless-attributes-interactions)
@@ -11,15 +11,15 @@
         - [Callback on parameters updates](#callback-on-parameters-updates)
         - [Instantiation logic with `__post_init__`](#instantiation-logic-with-__post_init__)
         - [Abstract methods](#abstract-methods)
-3. [👩‍💻 **Subclassing API**](#3-subclassing-api)
-4. [🤓 **Advanced**](#4-advanced)
+3. [👩‍💻 **Subclassing API**](#3-subclassing-api-)
+4. [🤓 **Advanced**](#4-advanced-)
     - [Post-creation protection](#post-creation-protection)
     - [Descriptor parameters](#descriptor-parameters)
     - [Multiple inheritance](#multiple-inheritance)
     - [Using `__slots__`](#using-__slots__)
     - [Breaking `ParamClass` protection scheme](#breaking-paramclass-protection-scheme)
-5. [🚀 **Contributing**](#5-contributing)
-6. [⚖️ **License**](#6-license)
+5. [🚀 **Contributing**](#5-contributing-)
+6. [⚖️ **License**](#6-license-)
 
 ## 1. Rationale 🧑‍🏫
 
