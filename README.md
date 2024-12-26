@@ -61,7 +61,7 @@ One accesses current parameters dict and missing parameters of an instance with 
 >>> A().missing_params
 ['parameter_with_no_default_value']
 ```
-Note that `A().a_method_turned_into_a_parameter` **is not** a _bound_ method -- see [descriptor parameters](#descriptor-parameters).
+Note that `A().a_method_turned_into_a_parameter` **is not** a _bound_ method -- see [Descriptor parameters](#descriptor-parameters).
 
 #### Protecting attributes with `@protected`
 
