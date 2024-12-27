@@ -200,7 +200,7 @@ class ParamClass(metaclass=_MetaParamClass):
     `__post_init__()`.
 
     Unprotected methods:
-        _on_param_will_be_set: Call before new parameter assignment.
+        _on_param_will_be_set: Call before parameter assignment.
         __post_init__: Init logic, after parameters assignment.
         __repr__: Show all non-default or missing, e.g. `A(x=1, y=?)`.
 
@@ -220,7 +220,7 @@ class ParamClass(metaclass=_MetaParamClass):
     # ========================= Subclasses may override these ==========================
     #
     def _on_param_will_be_set(self, attr: str, future_val: object) -> None:
-        """Call before new parameter assignment."""
+        """Call before parameter assignment."""
 
     def __post_init__(self, *args: object, **kwargs: object) -> None:
         """Init logic, after parameters assignment."""

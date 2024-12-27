@@ -183,7 +183,7 @@ As seen in [Additional functionalities](#additional-functionalities), three meth
 ```python
 # ===================== Subclasses may override these ======================
 def _on_param_will_be_set(self, attr: str, future_val: object) -> None:
-    """Call before new parameter assignment."""
+    """Call before parameter assignment."""
 
 def __post_init__(self, *args: object, **kwargs: object) -> None:
     """Init logic, after parameters assignment."""
