@@ -30,8 +30,8 @@ jobs:
         run: |
           uvx ruff check
           uvx ruff format --check
-      - name: Run pytest
+      - name: Run pytest with coverage
         run: |
-          uv pip install -e .
+          uv pip install .
           uv run pytest --cov-report=xml
       # Setup codecov later
