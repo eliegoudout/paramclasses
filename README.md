@@ -331,7 +331,7 @@ There is no such thing as "perfect attribute protection" in Python. As such `Par
 
 ### Type checkers
 
-The `@protected` decorator is not acting in the usual sense, as it is a simple wrapper meant to be detected and unwrapped by the metaclass constructing _paramclasses_. As such, type checkers such as [mypy](https://mypy-lang.org/) may be confused. If your project uses type checkers, we recommend locally disabling type checking with the following -- with the appropriate [error-code](https://mypy.readthedocs.io/en/stable/error_codes.html).
+The `@protected` decorator is not acting in the usual sense, as it is a simple wrapper meant to be detected and unwrapped by the metaclass constructing _paramclasses_. Consequently, type checkers such as [mypy](https://mypy-lang.org/) may be confused. If necessary, we recommend locally disabling type checking with the following comment -- and the appropriate [error-code](https://mypy.readthedocs.io/en/stable/error_codes.html).
 ```python
 @protected  # type: ignore[error-code]  # mypy is fooled
 def my_protected_method(self):
