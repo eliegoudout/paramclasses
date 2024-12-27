@@ -7,7 +7,7 @@ def test_trivial() -> None:
     """Test trivial example."""
 
     class A(ParamClass):
-        x: ...
+        x: int
         y: int = 5
         z: property = property(lambda _: ...)
 

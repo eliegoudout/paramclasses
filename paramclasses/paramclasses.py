@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from itertools import chain
 from reprlib import recursive_repr
 from types import MappingProxyType
+from typing import cast, final
 from warnings import warn
 
 
@@ -19,10 +20,10 @@ class protected:  # noqa: N801 (decorator-like capitalization)
     to annotations.
     """
 
-    val: ...
+    val: object
 
 
-def _unprotect(val: object) -> object:
+def _unprotect(val: object) -> tuple[object, bool]:
     """Unwrap protected value, recursively if needed."""
     if isinstance(val, protected):
         return _unprotect(val.val)[0], True
@@ -40,7 +41,7 @@ class _MissingType:
 class ProtectedError(AttributeError):
     """Don't assign or delete protected attributes."""
 
-
+@final
 class _MetaFrozen(type):
     """Make `_MetaParamClass` frozen with this metaclass.
 
@@ -61,7 +62,7 @@ class _MetaFrozen(type):
     def __delattr__(*_: object, **__: object) -> None:
         raise ProtectedError
 
-
+@final
 class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     """Specifically implemented as ParamClass metaclass.
 
@@ -105,8 +106,8 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         """
         protected_special = [mcs.default, mcs.protected, "__dict__"]
         # # Bases: default, protected
-        default = {}
-        protected_dict_bases = {}
+        default: dict = {}
+        protected_dict_bases: dict = {}
         for base in bases[::-1]:
             default |= getattr(base, mcs.default, {})
             # Previous bases protected coherence
@@ -124,7 +125,8 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         protected = set(chain(protected_dict_bases, protected_special))
 
         # Cannot slot protected
-        protected_then_slotted = protected & set(namespace.get("__slots__", ()))
+        slots = cast(tuple, namespace.get("__slots__", ()))
+        protected_then_slotted = protected & set(slots)
         if protected_then_slotted:
             msg = f"Cannot slot protected attributes: {list(protected_then_slotted)}"
             raise ProtectedError(msg)
@@ -141,7 +143,8 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
                 protected_new.append(attr)
 
         # Store new parameters and default
-        for attr in namespace.get("__annotations__", {}):
+        annotations: dict = cast(dict, namespace.get("__annotations__", {}))
+        for attr in annotations:
             mcs.assert_unprotected(attr, protected)
             mcs.assert_valid_param(attr)
             default[attr] = namespace_final.get(attr, mcs.missing)
@@ -246,7 +249,7 @@ class ParamClass(metaclass=_MetaParamClass):
         for attr, val in param_values.items():
             setattr(self, attr, val)
 
-    @protected
+    @protected  # type: ignore[prop-decorator]  # mypy is fooled
     @property
     def params(self) -> dict[str, object]:
         """Current parameter dict for instance."""
@@ -256,7 +259,7 @@ class ParamClass(metaclass=_MetaParamClass):
             for attr in getattr(self, mcs.default)
         }
 
-    @protected
+    @protected  # type: ignore[prop-decorator]  # mypy is fooled
     @property
     def missing_params(self) -> list[str]:
         """Parameters without value."""
@@ -267,7 +270,7 @@ class ParamClass(metaclass=_MetaParamClass):
             if not hasattr(self, attr) or getattr(self, attr) is mcs.missing
         ]
 
-    @protected
+    @protected  # type: ignore[misc]  # mypy is fooled
     def __init__(
         self,
         args: list | None = None,
@@ -286,14 +289,14 @@ class ParamClass(metaclass=_MetaParamClass):
                 instantiation.
 
         """
-        self.set_params(**param_values)
+        self.set_params(**param_values)  # type: ignore[operator]  # mypy is fooled
         if args is None:
             args = []
         if kwargs is None:
             kwargs = {}
         self.__post_init__(*args, **kwargs)
 
-    @protected
+    @protected  # type: ignore[override]  # mypy is fooled
     def __getattribute__(self, attr: str) -> object:
         """Handle descriptor parameters."""
         cls = type(self)
@@ -311,7 +314,7 @@ class ParamClass(metaclass=_MetaParamClass):
         msg = f"'{cls.__name__}' object has no attribute '{attr}'"
         raise AttributeError(msg)
 
-    @protected
+    @protected  # type: ignore[override]  # mypy is fooled
     def __setattr__(self, attr: str, val_potentially_protected: object) -> None:
         """Handle protection, missing value, descriptor parameters.
 
@@ -336,7 +339,7 @@ class ParamClass(metaclass=_MetaParamClass):
         else:
             super().__setattr__(attr, val)
 
-    @protected
+    @protected  # type: ignore[override]  # mypy is fooled
     def __delattr__(self, attr: str) -> None:
         """Handle protection, descriptor parameters."""
         # Handle protection

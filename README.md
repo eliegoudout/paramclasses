@@ -1,7 +1,9 @@
 [![python versions](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)](https://devguide.python.org/versions/)
 [![pipeline status](https://github.com/eliegoudout/paramclasses/actions/workflows/ci.yml/badge.svg)](https://github.com/eliegoudout/paramclasses/actions)
-[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![license MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv#readme)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff#readme)
+[![mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
 
 # `ParamClass`
 
@@ -23,6 +25,7 @@
     - [Multiple inheritance](#multiple-inheritance)
     - [Using `__slots__`](#using-__slots__)
     - [Breaking `ParamClass` protection scheme](#breaking-paramclass-protection-scheme)
+    - [Type checkers](#type-checkers)
 5. [🚀 **Contributing**](#5-contributing-)
 6. [⚖️ **License**](#6-license-)
 
@@ -31,7 +34,7 @@
 
 For a parameter-holding class (like [dataclasses](https://docs.python.org/3/library/dataclasses.html)), it is nice to embark some functionality (_e.g._ properties `params` to get a dict of parameters' `(key, value) pairs, `missing_params` for unassigned parameter-keys, ...). Inheriting them via subclassing would allows to factor out specialized functionalities with context-dependant methods (_e.g._ `fit`, `reset`, `plot`, etc...). However, such subclassing comes with a risk of attributes conflicts, especially for exposed APIs, when users do not necessarily know every "read-only" (or "**protected**") attributes from parents classes.
 
-To solve this problem, we propose a base `ParamClass` with a `@protected` decorator, which robustly protects target attributes from being accidentally overriden when subclassing, at runtime -- contrary to `typing.final` and `typing.Final`.
+To solve this problem, we propose a base `ParamClass` with a `@protected` decorator, which robustly protects target attributes from being accidentally overriden when subclassing, at runtime. Atlernatives such as [`typing.final`](https://docs.python.org/3/library/typing.html#typing.final) and [`typing.Final`](https://docs.python.org/3/library/typing.html#typing.Final) are designed for type checkers on which we do not want to rely -- from python 3.11 onwards, `final` does add a `__final__` flag when possible, but it will not affect immutable objects.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
@@ -194,7 +197,7 @@ Furthermore, _as a last resort_, developers may occasionally wish to use the fol
 - `mcs.protected`: Current value is `"__paramclass_protected_"`. Use `getattr(self, mcs.protected)` to access the set (`frozenset`) of protected parameters.
 - `mcs.missing`: The object representing the "missing value" in the default values of parameters.
 
-Strings `mcs.default` and `mcs.protected` act as special keys for paramclasses' namespaces, to leave `default` and `protected` available to users. We purposefully chose _would-be-mangled_ names for `mcs.default` and `mcs.protected`, to further decrease odds of natural conflict.
+Strings `mcs.default` and `mcs.protected` act as special keys for _paramclasses_' namespaces, to leave `default` and `protected` available to users. We purposefully chose _would-be-mangled_ names for `mcs.default` and `mcs.protected`, to further decrease odds of natural conflict.
 
 ```pycon
 >>> # Recommended way of accessing `default` and `protected`
@@ -323,6 +326,17 @@ There is no such thing as "perfect attribute protection" in Python. As such `Par
 1. Modifying `@protected` -- _huh?_
 2. Use custom sub-metaclass, after modifying meta-metaclass -- requires dedication.
 3. Manipulating `instance.__dict__` directly...
+
+<sup>Back to [Table of Contents](#readme)👆</sup>
+
+### Type checkers
+
+The `@protected` decorator is not acting in the usual sense, as it is a simple wrapper meant to be detected and unwrapped by the metaclass constructing _paramclasses_. As such, type checkers such as [mypy](https://mypy-lang.org/) may be confused. If your project uses type checkers, we recommend locally disabling type checking with the following.
+```python
+@protected  # type: ignore  # mypy is fooled
+def my_protected_method(self):
+```
+It is not ideal and _may_ be fixed in future updates.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
