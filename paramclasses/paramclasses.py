@@ -41,6 +41,7 @@ class _MissingType:
 class ProtectedError(AttributeError):
     """Don't assign or delete protected attributes."""
 
+
 @final
 class _MetaFrozen(type):
     """Make `_MetaParamClass` frozen with this metaclass.
@@ -61,6 +62,7 @@ class _MetaFrozen(type):
 
     def __delattr__(*_: object, **__: object) -> None:
         raise ProtectedError
+
 
 @final
 class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
