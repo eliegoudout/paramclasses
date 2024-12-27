@@ -25,7 +25,7 @@ docstring-code-format = true  # Enable reformatting of code snippets in docstrin
 
 
 [tool.mypy]
-files = "."
+files = ["paramclasses", "test"]
 
 
 [tool.pytest.ini_options]
