@@ -1,9 +1,10 @@
 [![python versions](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)](https://devguide.python.org/versions/)
-[![pipeline status](https://github.com/eliegoudout/paramclasses/actions/workflows/ci.yml/badge.svg)](https://github.com/eliegoudout/paramclasses/actions)
 [![license MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv#readme)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff#readme)
+[![pipeline status](https://github.com/eliegoudout/paramclasses/actions/workflows/ci.yml/badge.svg)](https://github.com/eliegoudout/paramclasses/actions)
+[![codecov](https://codecov.io/gh/eliegoudout/paramclasses/graph/badge.svg?token=G7YIOODJXE)](https://codecov.io/gh/eliegoudout/paramclasses)
 [![mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff#readme)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv#readme)
 
 # `ParamClass`
 

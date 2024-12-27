@@ -32,7 +32,7 @@ jobs:
           uvx ruff format --check
       - name: Install the project
         run: |
-          uv pip install .
+          uv pip install -e .
       - name: Run mypy
         run: |
           uv run mypy
