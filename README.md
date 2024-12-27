@@ -1,8 +1,12 @@
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+![Python Versions](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)
+
 # `ParamClass`
 
 ###### Table of Contents
 
-1. [🧑‍🏫 **Rationale**](#1-rationale-)
+1. [👩‍🏫 **Rationale**](#1-rationale-)
 2. [🧐 **Overview**](#2-overview-)
     - [Defining a _paramclass_](#defining-a-paramclass)
     - [Protecting attributes with `@protected`](#protecting-attributes-with-protected)
@@ -21,17 +25,21 @@
 5. [🚀 **Contributing**](#5-contributing-)
 6. [⚖️ **License**](#6-license-)
 
-## 1. Rationale 🧑‍🏫
+
+## 1. Rationale 👩‍🏫
 
 For a parameter-holding class (like [dataclasses](https://docs.python.org/3/library/dataclasses.html)), it is nice to embark some functionality (_e.g._ properties `params` to get a dict of parameters' `(key, value) pairs, `missing_params` for unassigned parameter-keys, ...). Inheriting them via subclassing would allows to factor out specialized functionalities with context-dependant methods (_e.g._ `fit`, `reset`, `plot`, etc...). However, such subclassing comes with a risk of attributes conflicts, especially for exposed APIs, when users do not necessarily know every "read-only" (or "**protected**") attributes from parents classes.
 
 To solve this problem, we propose a base `ParamClass` with a `@protected` decorator, which robustly protects target attributes from being accidentally overriden when subclassing, at runtime -- contrary to `typing.final` and `typing.Final`.
 
+<sup>Back to [Table of Contents](#readme)👆</sup>
+
+
 ## 2. Overview 🧐
 
-#### Defining a _paramclass_
+### Defining a _paramclass_
 
-A _paramclass_ is defined by subclassing `ParamClass` directly or another _paramclass_. Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), **parameters** are identified as **any annotated attribute** -- the annotation in itself does not matter -- and there is no need to defined `__init__`.
+A _paramclass_ is defined by subclassing `ParamClass` directly or another _paramclass_. Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), **parameters** are identified as **any annotated attribute** and instancation logic is automatically built-in -- though it can be [extended](#instantiation-logic-with-__post_init__).
 ```python
 from paramclasses import ParamClass
 
@@ -45,7 +53,7 @@ class A(ParamClass):
 
 ```
 
-Instances have a `repr` -- which can be overriden in subclasses -- displaying **non-default or missing** parameter-values.
+Instances have a `repr` -- which can be overriden in subclasses -- displaying **non-default or missing** parameter values.
 ```pycon
 >>> A(parameter_with_a__default_value="non-default value")
 A(parameter_with_a__default_value='non-default value', parameter_with_no_default_value=?)
@@ -63,7 +71,9 @@ One accesses current parameters dict and missing parameters of an instance with 
 ```
 Note that `A().a_method_turned_into_a_parameter` **is not** a _bound_ method -- see [Descriptor parameters](#descriptor-parameters).
 
-#### Protecting attributes with `@protected`
+<sup>Back to [Table of Contents](#readme)👆</sup>
+
+### Protecting attributes with `@protected`
 
 Say we define the following `BaseEstimator` class.
 ```python
@@ -85,8 +95,9 @@ paramclasses.paramclasses.ProtectedError: Attribute 'fit' is protected
 
 This **runtime** protection can be applied to all attributes -- with `protected(value)` --, methods, properties, etc... during class definition but [not after](#post-creation-protection). It is "robust" in the sense that breaking the designed behaviour, though possible, requires -- to our knowledge -- [obscure patterns](#breaking-paramclass-protection-scheme).
 
+<sup>Back to [Table of Contents](#readme)👆</sup>
 
-#### Seamless attributes interactions
+### Seamless attributes interactions
 
 Parameters can be assigned values like any other attribute -- unless specifically [protected](#protecting-attributes-with-protected) -- with `instance.attr = value`. It is also possible to set multiple parameters at once with keyword arguments during instantiation, or after with `set_params`.
 ```python
@@ -109,32 +120,41 @@ A(x=1)                          # ... and `A` remembers default values -- otherw
 AttributeError: Invalid parameters: {'z'}. Operation cancelled
 ```
 
-#### Additional functionalities
+### Additional functionalities
 
-##### Callback on parameters updates
+#### Callback on parameters updates
 
 Whenever an instance is assigned a value -- instantiation, `set_params`, dotted assignment -- the callback
 ```python
-def _on_param_will_be_set(self, attr: str, future_val: object) -> None:
+def _on_param_will_be_set(self, attr: str, future_val: object) -> None
 ```
 is triggered. For example, it can be used to `unfit` and estimator on specific modifications. As suggested by the name and signature, the callback operates just before the `future_val` assignment. There is currently no counterpart for parameter deletion. This could be added upon motivated interest.
 
-##### Instantiation logic with `__post_init__`
+<sup>Back to [Table of Contents](#readme)👆</sup>
 
-Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), a `__post_init__` method can be defined to complete instantiation after the initial setting of parameters values. It must have signature
+#### Instantiation logic with `__post_init__`
+
+Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), a `__post_init__` method can be defined to complete instantiation after the initial setting of parameter values. It must have signature
 ```python
-def __post_init__(self, *args: object, **kwargs: object) -> None: ...
+def __post_init__(self, *args: object, **kwargs: object) -> None
 ```
-and it is called at instantiation with the following signature:
+and is called as follows by `__init__`.
 ```python
-MyParamClass(args: list = [], kwargs: dict = {}, /, **param_values)
+# Close equivalent to actual implementation
+@protected
+def __init__(self, args: list = [], kwargs: dict = {}, /, **param_values: object) -> None:
+        self.set_params(**param_values)
+        self.__post_init__(*args, **kwargs)
+
 ```
 
 Since parameter values are set before `__post_init__` is called, they are accessible when it executes.
 
-##### Abstract methods
+<sup>Back to [Table of Contents](#readme)👆</sup>
 
-The base `ParamClass` already inherits `ABC` functionalities, so `@abstractmethod` can be used:
+#### Abstract methods
+
+The base `ParamClass` already inherits `ABC` functionalities, so `@abstractmethod` can be used.
 ```python
 from abc import abstractmethod
 
@@ -148,9 +168,12 @@ class A(ParamClass):
 TypeError: Can't instantiate abstract class A with abstract method next
 ```
 
+<sup>Back to [Table of Contents](#readme)👆</sup>
+
+
 ## 3. Subclassing API 👩‍💻
 
-As seen in [Additional functionalities](#additional-functionalities), three methods may be overriden by subclasses:
+As seen in [Additional functionalities](#additional-functionalities), three methods may be overriden by subclasses.
 ```python
 # ===================== Subclasses may override these ======================
 def _on_param_will_be_set(self, attr: str, future_val: object) -> None:
@@ -166,33 +189,50 @@ def __repr__(self) -> str:
 
 Furthermore, _as a last resort_, developers may occasionally wish to use the following _metaclass attributes_ -- where `mcs = type(ParamClass)`.
 
-- `mcs.default`: Use `getattr(self, mcs.default)` to access the dict (`mappingproxy`) of parameters' `(key, default value)` pairs. Current value is `"__paramclass_default_"`.
-- `mcs.protected`: Use `getattr(self, mcs.protected)` to access the set (`frozenset`) of protected parameters. Current value is `"__paramclass_protected_"`.
+- `mcs.default`: Current value is `"__paramclass_default_"`. Use `getattr(self, mcs.default)` to access the dict (`mappingproxy`) of parameters' `(key, default value)` pairs.
+- `mcs.protected`: Current value is `"__paramclass_protected_"`. Use `getattr(self, mcs.protected)` to access the set (`frozenset`) of protected parameters.
 - `mcs.missing`: The object representing the "missing value" in the default values of parameters.
 
-These as purposefully kept in the metaclass namespace to avoid as best as possible crowding `ParamClass` namespace. Indeed, users may want to use `default` or `missing` as parameter keys for example. Furthermore, their use should be occasional.
+Strings `mcs.default` and `mcs.protected` act as special keys for paramclasses' namespaces, to leave `default` and `protected` available to users. We purposefully chose _would-be-mangled_ names for `mcs.default` and `mcs.protected`, to further decrease odds of natural conflict.
+
+```pycon
+>>> # Recommended way of accessing `default` and `protected`
+>>> mcs = type(ParamClass)
+>>> getattr(ParamClass, mcs.default)    # Parameters' `(key, default value)` pairs
+mappingproxy({})
+>>> getattr(ParamClass, mcs.protected)  # Protected attributes
+frozenset({'__getattribute__', '__delattr__', 'set_params', '__paramclass_default_', '__init__', '__paramclass_protected_', '__setattr__', 'missing_params', '__dict__', 'params'})
+>>> # Works on subclasses and instances too -- with `mcs = type(type(self))`
+```
+
+<sup>Back to [Table of Contents](#readme)👆</sup>
+
 
 ## 4. Advanced 🤓
 
-#### Post-creation protection
+### Post-creation protection
 
-It is **not allowed** and will trigger a warning:
+It is **not allowed** and will be ignored with a warning.
 ```python
 class A(ParamClass):
     x: int = 1
 ```
 ```pycon
->>> A.x = protected(2)  # Should work with warning
+>>> A.x = protected(2)  # Assignment should WORK, protection should FAIL
 <stdin>:1: UserWarning: Cannot protect attribute 'x' after class creation. Ignored
 >>> a = A(); a
-A(x=2)                  # It indeed worked
->>> a.x = protected(3)  # Should work with warning
+A(x=2)                  # Assignment did work
+>>> a.x = protected(3)  # Assignment should WORK, protection should FAIL
 <stdin>:1: UserWarning: Cannot protect attribute 'x' on instance assignment. Ignored
 >>> a.x
-3                       # It indeed worked
+3                       # First protection did fail, new assignment did work
+>>> del a.x; a
+A(x=2)                  # Second protection did fail
 ```
 
-#### Descriptor parameters
+<sup>Back to [Table of Contents](#readme)👆</sup>
+
+### Descriptor parameters
 
 **TLDR**: using descriptors for parameter values **is fine** _if you know what to expect_.
 ```python
@@ -237,7 +277,9 @@ AttributeError: can't set attribute 'x'
 ```
 This should not be a very common use case anyway.
 
-#### Multiple inheritance
+<sup>Back to [Table of Contents](#readme)👆</sup>
+
+### Multiple inheritance
 
 Multiple inheritance is not a problem. Default values will be retrieved as expect following the MRO, but there's one caveat: protected attributes should be consistant between the bases. For example, if `A.x` is not protected while `B.x` is, one cannot take `(A, B)` for bases.
 ```python
@@ -260,7 +302,9 @@ class D(A, B): ...  # Should FAIL
 paramclasses.paramclasses.ProtectedError: Incoherent protection inheritance for attribute 'x'
 ```
 
-#### Using `__slots__`
+<sup>Back to [Table of Contents](#readme)👆</sup>
+
+### Using `__slots__`
 
 Before using `__slots__` with `ParamClass`, please note the following.
 
@@ -269,7 +313,9 @@ Before using `__slots__` with `ParamClass`, please note the following.
 3. Since `ParamClass` does not use `__slots__`, any of its subclasses will still have a `__dict__`.
 4. The overhead from `ParamClass` functionality, although not high, probably nullifies any `__slots__` optimization in most use cases.
 
-#### Breaking `ParamClass` protection scheme
+<sup>Back to [Table of Contents](#readme)👆</sup>
+
+### Breaking `ParamClass` protection scheme
 
 There is no such thing as "perfect attribute protection" in Python. As such `ParamClass` only provides protection against natural behaviour (and even unnatural to a large extent). Below are some knonwn easy ways to break it, representing **discouraged behaviour**. If you find other elementary ways, please report them in an issue.
 
@@ -277,11 +323,17 @@ There is no such thing as "perfect attribute protection" in Python. As such `Par
 2. Use custom sub-metaclass, after modifying meta-metaclass -- requires dedication.
 3. Manipulating `instance.__dict__` directly...
 
+<sup>Back to [Table of Contents](#readme)👆</sup>
+
 
 ## 5. Contributing 🚀
 
 Questions, [issues](https://github.com/eliegoudout/paramclasses/issues), [discussions](https://github.com/eliegoudout/paramclasses/discussions) and [pull requests](https://github.com/eliegoudout/paramclasses/pulls) are welcome! Please do not hesitate to [contact me](mailto:eliegoudout@hotmail.com).
 
+<sup>Back to [Table of Contents](#readme)👆</sup>
+
 ## 6. License ⚖️
 
 This package is distributed under the [MIT License](LICENSE).
+
+<sup>Back to [Table of Contents](#readme)👆</sup>
