@@ -199,7 +199,7 @@ Furthermore, _as a last resort_, developers may occasionally wish to use the fol
 - `mcs.protected`: Current value is `"__paramclass_protected_"`. Use `getattr(self, mcs.protected)` to access the set (`frozenset`) of protected parameters.
 - `mcs.missing`: The object representing the "missing value" in the default values of parameters.
 
-Strings `mcs.default` and `mcs.protected` act as special keys for _paramclasses_' namespaces, to leave `default` and `protected` available to users. We purposefully chose _would-be-mangled_ names for `mcs.default` and `mcs.protected`, to further decrease odds of natural conflict.
+Strings `mcs.default` and `mcs.protected` act as special keys for _paramclasses_' namespaces, to leave `default` and `protected` available to users. We purposefully chose _would-be-mangled_ names to further decrease odds of natural conflict.
 
 ```pycon
 >>> # Recommended way of accessing `default` and `protected`
