@@ -1,5 +1,5 @@
 [![python versions](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)](https://devguide.python.org/versions/)
-[![pipeline status](https://github.com/github/docs/actions/workflows/main.yml/badge.svg)](https://github.com/eliegoudout/paramclasses/actions)
+[![pipeline status](https://github.com/eliegoudout/paramclasses/actions/workflows/ci.yml/badge.svg?label=CI)](https://github.com/eliegoudout/paramclasses/actions)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
