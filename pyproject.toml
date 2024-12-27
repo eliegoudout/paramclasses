@@ -24,6 +24,10 @@ select = ["ALL"]
 docstring-code-format = true  # Enable reformatting of code snippets in docstrings.
 
 
+[tool.mypy]
+files = "."
+
+
 [tool.pytest.ini_options]
 testpaths = "test"
 addopts = [
