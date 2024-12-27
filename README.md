@@ -28,12 +28,13 @@
     - [Breaking `ParamClass` protection scheme](#breaking-paramclass-protection-scheme)
     - [Type checkers](#type-checkers)
 5. [🚀 **Contributing**](#5-contributing-)
+    - [Developing with `uv`](#developing-with-uv)
 6. [⚖️ **License**](#6-license-)
 
 
 ## 1. Rationale 👩‍🏫
 
-For a parameter-holding class (like [dataclasses](https://docs.python.org/3/library/dataclasses.html)), it is nice to embark some functionality (_e.g._ properties `params` to get a dict of parameters' `(key, value)` pairs, `missing_params` for unassigned parameter-keys, ...). Inheriting them via subclassing would allows to factor out specialized functionalities with context-dependant methods (_e.g._ `fit`, `reset`, `plot`, etc...). However, such subclassing comes with a risk of attributes conflicts, especially for exposed APIs, when users do not necessarily know every "read-only" (or "**protected**") attributes from parents classes.
+For a parameter-holding class (like [dataclasses](https://docs.python.org/3/library/dataclasses.html)), it is nice to embark some functionality (_e.g._ properties `params` to get a dict of parameters' `(key, value)` pairs, `missing_params` for unassigned parameter keys, ...). Inheriting them via subclassing would allows to factor out specialized functionalities with context-dependant methods (_e.g._ `fit`, `reset`, `plot`, etc...). However, such subclassing comes with a risk of attributes conflicts, especially for exposed APIs, when users do not necessarily know every "read-only" (or "**protected**") attributes from parents classes.
 
 To solve this problem, we propose a base `ParamClass` with a `@protected` decorator, which robustly protects target attributes from being accidentally overriden when subclassing, at runtime. Atlernatives such as [`typing.final`](https://docs.python.org/3/library/typing.html#typing.final) and [`typing.Final`](https://docs.python.org/3/library/typing.html#typing.Final) are designed for type checkers on which we do not want to rely -- from python 3.11 onwards, `final` does add a `__final__` flag when possible, but it will not affect immutable objects.
 
@@ -345,6 +346,23 @@ It is not ideal and _may_ be fixed in future updates.
 ## 5. Contributing 🚀
 
 Questions, [issues](https://github.com/eliegoudout/paramclasses/issues), [discussions](https://github.com/eliegoudout/paramclasses/discussions) and [pull requests](https://github.com/eliegoudout/paramclasses/pulls) are welcome! Please do not hesitate to [contact me](mailto:eliegoudout@hotmail.com).
+
+### Developing with `uv`
+
+The project is developed with [uv](https://github.com/astral-sh/uv#readme) which simplifies _soooo_ many things!
+```bash
+# Installing `uv` on Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Using `uv` command may require to restart the bash session
+```
+After having installed [uv](https://github.com/astral-sh/uv#readme), you can independently use all of the following without ever worrying about installing python or dependencies, or creating virtual environments.
+```bash
+uvx ruff check                        # Check linting
+uvx ruff format --diff                # Check formatting
+uv run mypy                           # Run mypy
+uv pip install -e . && uv run pytest  # Run pytest
+uv run python                         # Interactive session in virtual environment
+```
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
