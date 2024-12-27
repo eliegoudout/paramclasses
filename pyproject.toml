@@ -27,9 +27,9 @@ docstring-code-format = true  # Enable reformatting of code snippets in docstrin
 [tool.pytest.ini_options]
 testpaths = "test"
 addopts = [
-    "--import-mode=importlib",          # Recommended by pytest "Tests outside application code"
-    "--cov",
-    "--cov-report term-missing",
+    "--import-mode=importlib",  # Recommended by pytest
+    "--cov=paramclasses",
+    "--cov-report=term-missing",
 ]
 
 
