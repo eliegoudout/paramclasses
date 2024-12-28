@@ -58,10 +58,12 @@ class _MetaFrozen(type):
         return super().__new__(mcs, name, bases, namespace)
 
     def __setattr__(*_: object, **__: object) -> None:
-        raise ProtectedError
+        msg = "`_MetaParamClass' attributes are frozen"
+        raise ProtectedError(msg)
 
     def __delattr__(*_: object, **__: object) -> None:
-        raise ProtectedError
+        msg = "`_MetaParamClass' attributes are frozen"
+        raise ProtectedError(msg)
 
 
 @final
