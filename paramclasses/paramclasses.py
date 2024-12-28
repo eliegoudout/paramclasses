@@ -80,21 +80,21 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     missing = _MissingType("?")  # repr
 
     @staticmethod
-    def assert_unprotected(attr: str, protected: Collection) -> None:
+    def _assert_unprotected(attr: str, protected: Collection) -> None:
         """Assert that `attr not in protected`."""
         if attr in protected:
             msg = f"Attribute '{attr}' is protected"
             raise ProtectedError(msg)
 
     @staticmethod
-    def assert_valid_param(attr: str) -> None:
+    def _assert_valid_param(attr: str) -> None:
         """Assert that `attr` is authorized as parameter name."""
         if attr.startswith("__") and attr.endswith("__"):
             msg = f"Double dunder parameters ('{attr}') are forbidden"
             raise AttributeError(msg)
 
     @classmethod
-    def dont_assign_missing(mcs, attr: str, val: object) -> None:  # noqa: N804
+    def _dont_assign_missing(mcs, attr: str, val: object) -> None:  # noqa: N804
         """Forbid assigning the special 'missing value'."""
         if val is mcs.missing:
             msg = f"Assigning special missing value (attribute '{attr}') is forbidden"
@@ -139,9 +139,9 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         protected_new = []
         namespace_final = {}
         for attr, val_potentially_protected in namespace.items():
-            mcs.assert_unprotected(attr, protected)
+            mcs._assert_unprotected(attr, protected)
             val, was_protected = _unprotect(val_potentially_protected)
-            mcs.dont_assign_missing(attr, val)
+            mcs._dont_assign_missing(attr, val)
             namespace_final[attr] = val
             if was_protected:
                 protected_new.append(attr)
@@ -149,8 +149,8 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         # Store new parameters and default
         annotations: dict = cast(dict, namespace.get("__annotations__", {}))
         for attr in annotations:
-            mcs.assert_unprotected(attr, protected)
-            mcs.assert_valid_param(attr)
+            mcs._assert_unprotected(attr, protected)
+            mcs._assert_valid_param(attr)
             default[attr] = namespace_final.get(attr, mcs.missing)
 
         # Update namespace
@@ -162,9 +162,9 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     def __setattr__(cls, attr: str, val_potentially_protected: object) -> None:
         """Handle protection, missing value."""
         mcs = type(cls)
-        mcs.assert_unprotected(attr, getattr(cls, mcs.protected))
+        mcs._assert_unprotected(attr, getattr(cls, mcs.protected))
         val, was_protected = _unprotect(val_potentially_protected)
-        mcs.dont_assign_missing(attr, val)
+        mcs._dont_assign_missing(attr, val)
         if was_protected:
             warn(
                 f"Cannot protect attribute '{attr}' after class creation. Ignored",
@@ -175,7 +175,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     def __delattr__(cls, attr: str) -> None:
         """Handle protection."""
         mcs = type(cls)
-        mcs.assert_unprotected(attr, getattr(cls, mcs.protected))
+        mcs._assert_unprotected(attr, getattr(cls, mcs.protected))
         return super().__delattr__(attr)
 
 
@@ -305,13 +305,25 @@ class ParamClass(metaclass=_MetaParamClass):
         """Handle descriptor parameters."""
         cls = type(self)
         mcs = type(cls)
+        vars_self = super().__getattribute__("__dict__")
+
+        # Special case __dict__, which is protected
+        if attr == "__dict__":  # To save a few statements
+            if attr in vars_self:
+                del vars_self[attr]
+            return vars_self
+
+        # Remove attr from `vars(self)` if protected -- should not be there!
+        if attr in vars_self and attr in getattr(cls, mcs.protected):
+            del vars_self[attr]
+
         if attr not in getattr(cls, mcs.default):
             return super().__getattribute__(attr)
 
         # Handle descriptor parameters
         # https://docs.python.org/3/howto/descriptor.html#invocation-from-an-instance
-        if attr in vars(self):
-            return vars(self)[attr]
+        if attr in vars_self:
+            return vars_self[attr]
         for base in cls.__mro__:
             if attr in vars(base):
                 return vars(base)[attr]
@@ -327,9 +339,9 @@ class ParamClass(metaclass=_MetaParamClass):
         """
         mcs = type(type(self))
         # Handle protection, missing value
-        mcs.assert_unprotected(attr, getattr(self, mcs.protected))
+        mcs._assert_unprotected(attr, getattr(self, mcs.protected))
         val, was_protected = _unprotect(val_potentially_protected)
-        mcs.dont_assign_missing(attr, val)
+        mcs._dont_assign_missing(attr, val)
         if was_protected:
             warn(
                 f"Cannot protect attribute '{attr}' on instance assignment. Ignored",
@@ -348,7 +360,7 @@ class ParamClass(metaclass=_MetaParamClass):
         """Handle protection, descriptor parameters."""
         # Handle protection
         mcs = type(type(self))
-        mcs.assert_unprotected(attr, getattr(self, mcs.protected))
+        mcs._assert_unprotected(attr, getattr(self, mcs.protected))
 
         # Handle descriptor parameters
         if attr in getattr(self, mcs.default):

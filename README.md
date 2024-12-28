@@ -326,8 +326,7 @@ Before using `__slots__` with `ParamClass`, please note the following.
 There is no such thing as "perfect attribute protection" in Python. As such `ParamClass` only provides protection against natural behaviour (and even unnatural to a large extent). Below are some knonwn easy ways to break it, representing **discouraged behaviour**. If you find other elementary ways, please report them in an issue.
 
 1. Modifying `@protected` -- _huh?_
-2. Use custom sub-metaclass, after modifying meta-metaclass -- requires dedication.
-3. Manipulating `instance.__dict__` directly...
+2. Use custom sub-metaclass, after modifying meta-metaclass -- requires evil dedication.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
