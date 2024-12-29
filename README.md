@@ -115,7 +115,7 @@ class A(ParamClass):
 ```pycon
 >>> A(x=0, y=1)                 # Instantiation assignments
 A(x=0)                          # Only shows non-default values
->>> A().set_params(x=0, y=2)    # `set_params assignments
+>>> A().set_params(x=0, y=2)    # `set_params` assignments
 >>> A().y = 1                   # Usual assignment
 >>> del A(x=0).x                # Usual deletion
 >>> A.x = 1                     # Class-level assignment/deletion works...
@@ -209,6 +209,13 @@ mappingproxy({})
 >>> getattr(ParamClass, mcs.protected)  # Protected attributes
 frozenset({'__getattribute__', '__delattr__', 'set_params', '__paramclass_default_', '__init__', '__paramclass_protected_', '__setattr__', 'missing_params', '__dict__', 'params'})
 >>> # Works on subclasses and instances too -- with `mcs = type(type(self))`
+```
+
+Finally, when subclassing an external `Parent` class, one can check whether it is a paramclass with `isparamclass`.
+```python
+from paramclasses import isparamclass
+
+isparamclass(Parent)  # Returns a boolean
 ```
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
@@ -326,7 +333,7 @@ Before using `__slots__` with `ParamClass`, please note the following.
 There is no such thing as "perfect attribute protection" in Python. As such `ParamClass` only provides protection against natural behaviour (and even unnatural to a large extent). Below are some knonwn easy ways to break it, representing **discouraged behaviour**. If you find other elementary ways, please report them in an issue.
 
 1. Modifying `@protected` -- _huh?_
-2. Use custom sub-metaclass, after modifying meta-metaclass -- requires evil dedication.
+2. Modifying or subclassing `type(ParamClass)` -- requires evil dedication.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 

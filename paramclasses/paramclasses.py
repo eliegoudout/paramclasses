@@ -1,6 +1,6 @@
 """Implements `ParamClass`."""
 
-__all__ = ["ParamClass", "ProtectedError", "protected"]
+__all__ = ["ParamClass", "ProtectedError", "isparamclass", "protected"]
 
 from abc import ABCMeta
 from collections.abc import Collection
@@ -180,7 +180,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
 
 class ParamClass(metaclass=_MetaParamClass):
-    """Parameter-holding classes with robust subclassing protection.
+    """Parameter-holding class with robust subclassing protection.
 
     This is the base "paramclass". To define a "paramclass", simply
     subclass `ParamClass` or any of its subclasses, inheriting from its
@@ -367,3 +367,13 @@ class ParamClass(metaclass=_MetaParamClass):
             del vars(self)[attr]
         else:
             super().__delattr__(attr)
+
+
+def isparamclass(cls: type) -> bool:
+    """Check if `cls` is a paramclass."""
+    # Should have same metaclass
+    if type(cls) is not type(ParamClass):
+        return False
+
+    # Should inherit from `ParamClass`
+    return any(Parent is ParamClass for Parent in cls.__mro__)
