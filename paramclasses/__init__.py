@@ -11,6 +11,22 @@ Exposed API:
         Decorator to make read-only, including in subclasses.
 """
 
-__all__ = ["ParamClass", "ProtectedError", "isparamclass", "protected"]
+__all__ = [
+    "DEFAULT",
+    "MISSING",
+    "PROTECTED",
+    "ParamClass",
+    "ProtectedError",
+    "isparamclass",
+    "protected",
+]
 
-from .paramclasses import ParamClass, ProtectedError, isparamclass, protected
+from .paramclasses import (
+    DEFAULT,
+    MISSING,
+    PROTECTED,
+    ParamClass,
+    ProtectedError,
+    isparamclass,
+    protected,
+)

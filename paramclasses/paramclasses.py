@@ -1,6 +1,14 @@
 """Implements `ParamClass`."""
 
-__all__ = ["ParamClass", "ProtectedError", "isparamclass", "protected"]
+__all__ = [
+    "DEFAULT",
+    "MISSING",
+    "PROTECTED",
+    "ParamClass",
+    "ProtectedError",
+    "isparamclass",
+    "protected",
+]
 
 from abc import ABCMeta
 from collections.abc import Collection
@@ -12,30 +20,38 @@ from typing import cast, final
 from warnings import warn
 
 
-@dataclass
-class protected:  # noqa: N801 (decorator-like capitalization)
-    """Decorator to make read-only, including in subclasses.
-
-    Should always be the outtermost decorator. Protection doesn't apply
-    to annotations.
-    """
-
-    val: object
-
-
-def _unprotect(val: object) -> tuple[object, bool]:
-    """Unwrap protected value, recursively if needed."""
-    if isinstance(val, protected):
-        return _unprotect(val.val)[0], True
-    return val, False
-
-
 @dataclass(frozen=True)
 class _MissingType:
     repr: str = "..."
 
     def __repr__(self) -> str:
         return self.repr
+
+
+DEFAULT = "__paramclass_default_"  # would-be-mangled on purpose
+PROTECTED = "__paramclass_protected_"  # would-be-mangled on purpose
+MISSING = _MissingType("?")  # Sentinel object better representing missing value
+
+
+@dataclass(frozen=True)
+class _ProtectedType:
+    val: object
+
+
+def protected(val: object) -> _ProtectedType:
+    """Make read-only with this decorator, including in subclasses.
+
+    Should always be the outtermost decorator. Protection doesn't apply
+    to annotations.
+    """
+    return _ProtectedType(val)
+
+
+def _unprotect(val: object) -> tuple[object, bool]:
+    """Unwrap protected value, recursively if needed."""
+    if isinstance(val, _ProtectedType):
+        return _unprotect(val.val)[0], True
+    return val, False
 
 
 class ProtectedError(AttributeError):
@@ -75,9 +91,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     be compatible with its functionality.
     """
 
-    default = "__paramclass_default_"  # would-be-mangled on purpose
     protected = "__paramclass_protected_"  # would-be-mangled on purpose
-    missing = _MissingType("?")  # repr
 
     @staticmethod
     def _assert_unprotected(attr: str, protected: Collection) -> None:
@@ -96,7 +110,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     @classmethod
     def _dont_assign_missing(mcs, attr: str, val: object) -> None:  # noqa: N804
         """Forbid assigning the special 'missing value'."""
-        if val is mcs.missing:
+        if val is MISSING:
             msg = f"Assigning special missing value (attribute '{attr}') is forbidden"
             raise ValueError(msg)
 
@@ -108,19 +122,19 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
             2. Inspects `namespace` and its `__annotations__` to infer
                 new parameters and newly protected attributes.
         """
-        protected_special = [mcs.default, mcs.protected, "__dict__"]
+        protected_special = [DEFAULT, PROTECTED, "__dict__"]
         # # Bases: default, protected
         default: dict = {}
         protected_dict_bases: dict = {}
         for base in bases[::-1]:
-            default |= getattr(base, mcs.default, {})
+            default |= getattr(base, DEFAULT, {})
             # Previous bases protected coherence
             for attr, val_protected in protected_dict_bases.items():
-                val = getattr(base, attr, mcs.missing)
-                if not (val is val_protected or val is mcs.missing):
+                val = getattr(base, attr, MISSING)
+                if val is not val_protected and val is not MISSING:
                     msg = f"Incoherent protection inheritance for attribute '{attr}'"
                     raise ProtectedError(msg)
-            for attr in getattr(base, mcs.protected, []):
+            for attr in getattr(base, PROTECTED, []):
                 if attr in protected_dict_bases or attr in protected_special:
                     continue
                 protected_dict_bases[attr] = getattr(base, attr)
@@ -132,7 +146,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         slots = cast(tuple, namespace.get("__slots__", ()))
         protected_then_slotted = protected & set(slots)
         if protected_then_slotted:
-            msg = f"Cannot slot protected attributes: {list(protected_then_slotted)}"
+            msg = f"Cannot slot already protected attributes: {protected_then_slotted}"
             raise ProtectedError(msg)
 
         # Unwrap decorator and identify new protected
@@ -151,18 +165,18 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         for attr in annotations:
             mcs._assert_unprotected(attr, protected)
             mcs._assert_valid_param(attr)
-            default[attr] = namespace_final.get(attr, mcs.missing)
+            default[attr] = namespace_final.get(attr, MISSING)
 
         # Update namespace
-        namespace_final[mcs.default] = MappingProxyType(default)
-        namespace_final[mcs.protected] = frozenset(chain(protected, protected_new))
+        namespace_final[DEFAULT] = MappingProxyType(default)
+        namespace_final[PROTECTED] = frozenset(chain(protected, protected_new))
 
         return super().__new__(mcs, name, bases, namespace_final)
 
     def __setattr__(cls, attr: str, val_potentially_protected: object) -> None:
         """Handle protection, missing value."""
         mcs = type(cls)
-        mcs._assert_unprotected(attr, getattr(cls, mcs.protected))
+        mcs._assert_unprotected(attr, getattr(cls, PROTECTED))
         val, was_protected = _unprotect(val_potentially_protected)
         mcs._dont_assign_missing(attr, val)
         if was_protected:
@@ -175,7 +189,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     def __delattr__(cls, attr: str) -> None:
         """Handle protection."""
         mcs = type(cls)
-        mcs._assert_unprotected(attr, getattr(cls, mcs.protected))
+        mcs._assert_unprotected(attr, getattr(cls, PROTECTED))
         return super().__delattr__(attr)
 
 
@@ -216,7 +230,7 @@ class ParamClass(metaclass=_MetaParamClass):
 
     Protected properties:
         params (dict[str, object]): Current parameter dict for instance.
-        missing_params (list[str]): Parameters without value.
+        missing_params (tuple[str]): Parameters without value.
     """
 
     # ========================= Subclasses may override these ==========================
@@ -230,12 +244,10 @@ class ParamClass(metaclass=_MetaParamClass):
     @recursive_repr()
     def __repr__(self) -> str:
         """Show all non-default or missing, e.g. `A(x=1, z=?)`."""
-        mcs = type(type(self))
         params_str = ", ".join(
-            f"{attr}={getattr(self, attr, mcs.missing)!r}"
-            for attr, val_default in getattr(self, mcs.default).items()
-            if (val_default is mcs.missing)
-            or (getattr(self, attr, mcs.missing) != val_default)
+            f"{attr}={getattr(self, attr, MISSING)!r}"
+            for attr, val_default in getattr(self, DEFAULT).items()
+            if (val_default is MISSING) or (getattr(self, attr, MISSING) != val_default)
         )
         return f"{type(self).__name__}({params_str})"
 
@@ -244,8 +256,7 @@ class ParamClass(metaclass=_MetaParamClass):
     @protected
     def set_params(self, **param_values: object) -> None:
         """Set multiple parameter values at once via keywords."""
-        mcs = type(type(self))
-        wrong = set(param_values) - set(getattr(self, mcs.default))
+        wrong = set(param_values) - set(getattr(self, DEFAULT))
         if wrong:
             msg = f"Invalid parameters: {wrong}. Operation cancelled"
             raise AttributeError(msg)
@@ -257,22 +268,17 @@ class ParamClass(metaclass=_MetaParamClass):
     @property
     def params(self) -> dict[str, object]:
         """Current parameter dict for instance."""
-        mcs = type(type(self))
-        return {
-            attr: getattr(self, attr, mcs.missing)
-            for attr in getattr(self, mcs.default)
-        }
+        return {attr: getattr(self, attr, MISSING) for attr in getattr(self, DEFAULT)}
 
     @protected  # type: ignore[prop-decorator]  # mypy is fooled
     @property
-    def missing_params(self) -> list[str]:
+    def missing_params(self) -> tuple[str]:
         """Parameters without value."""
-        mcs = type(type(self))
-        return [
+        return tuple(
             attr
-            for attr in getattr(self, mcs.default)
-            if not hasattr(self, attr) or getattr(self, attr) is mcs.missing
-        ]
+            for attr in getattr(self, DEFAULT)
+            if not hasattr(self, attr) or getattr(self, attr) is MISSING
+        )
 
     @protected  # type: ignore[misc]  # mypy is fooled
     def __init__(
@@ -304,7 +310,6 @@ class ParamClass(metaclass=_MetaParamClass):
     def __getattribute__(self, attr: str) -> object:
         """Handle descriptor parameters."""
         cls = type(self)
-        mcs = type(cls)
         vars_self = super().__getattribute__("__dict__")
 
         # Special case __dict__, which is protected
@@ -314,10 +319,10 @@ class ParamClass(metaclass=_MetaParamClass):
             return vars_self
 
         # Remove attr from `vars(self)` if protected -- should not be there!
-        if attr in vars_self and attr in getattr(cls, mcs.protected):
+        if attr in vars_self and attr in getattr(cls, PROTECTED):
             del vars_self[attr]
 
-        if attr not in getattr(cls, mcs.default):
+        if attr not in getattr(cls, DEFAULT):
             return super().__getattribute__(attr)
 
         # Handle descriptor parameters
@@ -339,7 +344,7 @@ class ParamClass(metaclass=_MetaParamClass):
         """
         mcs = type(type(self))
         # Handle protection, missing value
-        mcs._assert_unprotected(attr, getattr(self, mcs.protected))
+        mcs._assert_unprotected(attr, getattr(self, PROTECTED))
         val, was_protected = _unprotect(val_potentially_protected)
         mcs._dont_assign_missing(attr, val)
         if was_protected:
@@ -349,7 +354,7 @@ class ParamClass(metaclass=_MetaParamClass):
             )
 
         # Handle callback, descriptor parameters
-        if attr in getattr(self, mcs.default):
+        if attr in getattr(self, DEFAULT):
             self._on_param_will_be_set(attr, val)
             vars(self)[attr] = val
         else:
@@ -360,10 +365,10 @@ class ParamClass(metaclass=_MetaParamClass):
         """Handle protection, descriptor parameters."""
         # Handle protection
         mcs = type(type(self))
-        mcs._assert_unprotected(attr, getattr(self, mcs.protected))
+        mcs._assert_unprotected(attr, getattr(self, PROTECTED))
 
         # Handle descriptor parameters
-        if attr in getattr(self, mcs.default):
+        if attr in getattr(self, DEFAULT):
             del vars(self)[attr]
         else:
             super().__delattr__(attr)

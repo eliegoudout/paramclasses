@@ -193,22 +193,21 @@ def __repr__(self) -> str:
 
 ```
 
-Furthermore, _as a last resort_, developers may occasionally wish to use the following _metaclass attributes_ -- where `mcs = type(ParamClass)`.
+Furthermore, _as a last resort_, developers may occasionally wish to use the following module attributes.
 
-- `mcs.default`: Current value is `"__paramclass_default_"`. Use `getattr(self, mcs.default)` to access the dict (`mappingproxy`) of parameters' `(key, default value)` pairs.
-- `mcs.protected`: Current value is `"__paramclass_protected_"`. Use `getattr(self, mcs.protected)` to access the set (`frozenset`) of protected parameters.
-- `mcs.missing`: The object representing the "missing value" in the default values of parameters.
+- `DEFAULT`: Current value is `"__paramclass_default_"`. Use `getattr(self, DEFAULT)` to access the dict (`mappingproxy`) of parameters' `(key, default value)` pairs.
+- `PROTECTED`: Current value is `"__paramclass_protected_"`. Use `getattr(self, PROTECTED)` to access the set (`frozenset`) of protected parameters.
+- `MISSING`: The object representing the "missing value" in the default values of parameters. Using `instance.missing_params` should almost always be enough, but if necessary, use `val is MISSING` to check for missing values.
 
-Strings `mcs.default` and `mcs.protected` act as special keys for _paramclasses_' namespaces, to leave `default` and `protected` available to users. We purposefully chose _would-be-mangled_ names to further decrease odds of natural conflict.
+Strings `DEFAULT` and `PROTECTED` act as special protected keys for _paramclasses_' namespaces, to leave `default` and `protected` available to users. We purposefully chose _would-be-mangled_ names to further decrease odds of natural conflict.
 
-```pycon
->>> # Recommended way of accessing `default` and `protected`
->>> mcs = type(ParamClass)
->>> getattr(ParamClass, mcs.default)    # Parameters' `(key, default value)` pairs
-mappingproxy({})
->>> getattr(ParamClass, mcs.protected)  # Protected attributes
-frozenset({'__getattribute__', '__delattr__', 'set_params', '__paramclass_default_', '__init__', '__paramclass_protected_', '__setattr__', 'missing_params', '__dict__', 'params'})
->>> # Works on subclasses and instances too -- with `mcs = type(type(self))`
+```python
+# Recommended way of using `DEFAULT` and `PROTECTED`
+from paramclasses import ParamClass, DEFAULT, PROTECTED
+
+getattr(ParamClass, DEFAULT)    # mappingproxy({})
+getattr(ParamClass, PROTECTED)  # frozenset({'params', '__getattribute__', '__paramclass_default_', '__paramclass_protected_', 'missing_params', '__setattr__', '__init__', '__delattr__', 'set_params', '__dict__'})
+# Works on subclasses and instances too
 ```
 
 Finally, when subclassing an external `Parent` class, one can check whether it is a paramclass with `isparamclass`.
