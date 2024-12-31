@@ -82,6 +82,27 @@ class _MetaFrozen(type):
         raise ProtectedError(msg)
 
 
+def _assert_unprotected(attr: str, protected: Collection) -> None:
+    """Assert that `attr not in protected`."""
+    if attr in protected:
+        msg = f"Attribute '{attr}' is protected"
+        raise ProtectedError(msg)
+
+
+def _assert_valid_param(attr: str) -> None:
+    """Assert that `attr` is authorized as parameter name."""
+    if attr.startswith("__") and attr.endswith("__"):
+        msg = f"Double dunder parameters ('{attr}') are forbidden"
+        raise AttributeError(msg)
+
+
+def _dont_assign_missing(attr: str, val: object) -> None:
+    """Forbid assigning the special 'missing value'."""
+    if val is MISSING:
+        msg = f"Assigning special missing value (attribute '{attr}') is forbidden"
+        raise ValueError(msg)
+
+
 @final
 class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     """Specifically implemented as ParamClass metaclass.
@@ -90,29 +111,6 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     identification, with default values. Also subclasses `ABCMeta` to
     be compatible with its functionality.
     """
-
-    protected = "__paramclass_protected_"  # would-be-mangled on purpose
-
-    @staticmethod
-    def _assert_unprotected(attr: str, protected: Collection) -> None:
-        """Assert that `attr not in protected`."""
-        if attr in protected:
-            msg = f"Attribute '{attr}' is protected"
-            raise ProtectedError(msg)
-
-    @staticmethod
-    def _assert_valid_param(attr: str) -> None:
-        """Assert that `attr` is authorized as parameter name."""
-        if attr.startswith("__") and attr.endswith("__"):
-            msg = f"Double dunder parameters ('{attr}') are forbidden"
-            raise AttributeError(msg)
-
-    @classmethod
-    def _dont_assign_missing(mcs, attr: str, val: object) -> None:  # noqa: N804
-        """Forbid assigning the special 'missing value'."""
-        if val is MISSING:
-            msg = f"Assigning special missing value (attribute '{attr}') is forbidden"
-            raise ValueError(msg)
 
     def __new__(mcs, name: str, bases: tuple, namespace: dict[str, object]) -> type:  # noqa: N804
         """Most of `_MetaParamClass` logic.
@@ -153,9 +151,9 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         protected_new = []
         namespace_final = {}
         for attr, val_potentially_protected in namespace.items():
-            mcs._assert_unprotected(attr, protected)
+            _assert_unprotected(attr, protected)
             val, was_protected = _unprotect(val_potentially_protected)
-            mcs._dont_assign_missing(attr, val)
+            _dont_assign_missing(attr, val)
             namespace_final[attr] = val
             if was_protected:
                 protected_new.append(attr)
@@ -163,8 +161,8 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         # Store new parameters and default
         annotations: dict = cast(dict, namespace.get("__annotations__", {}))
         for attr in annotations:
-            mcs._assert_unprotected(attr, protected)
-            mcs._assert_valid_param(attr)
+            _assert_unprotected(attr, protected)
+            _assert_valid_param(attr)
             default[attr] = namespace_final.get(attr, MISSING)
 
         # Update namespace
@@ -175,10 +173,9 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
     def __setattr__(cls, attr: str, val_potentially_protected: object) -> None:
         """Handle protection, missing value."""
-        mcs = type(cls)
-        mcs._assert_unprotected(attr, getattr(cls, PROTECTED))
+        _assert_unprotected(attr, getattr(cls, PROTECTED))
         val, was_protected = _unprotect(val_potentially_protected)
-        mcs._dont_assign_missing(attr, val)
+        _dont_assign_missing(attr, val)
         if was_protected:
             warn(
                 f"Cannot protect attribute '{attr}' after class creation. Ignored",
@@ -188,8 +185,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
     def __delattr__(cls, attr: str) -> None:
         """Handle protection."""
-        mcs = type(cls)
-        mcs._assert_unprotected(attr, getattr(cls, PROTECTED))
+        _assert_unprotected(attr, getattr(cls, PROTECTED))
         return super().__delattr__(attr)
 
 
@@ -342,11 +338,10 @@ class ParamClass(metaclass=_MetaParamClass):
         Also call the `_on_param_will_be_set()` callback when `attr` is
         a parameter key.
         """
-        mcs = type(type(self))
         # Handle protection, missing value
-        mcs._assert_unprotected(attr, getattr(self, PROTECTED))
+        _assert_unprotected(attr, getattr(self, PROTECTED))
         val, was_protected = _unprotect(val_potentially_protected)
-        mcs._dont_assign_missing(attr, val)
+        _dont_assign_missing(attr, val)
         if was_protected:
             warn(
                 f"Cannot protect attribute '{attr}' on instance assignment. Ignored",
@@ -364,8 +359,7 @@ class ParamClass(metaclass=_MetaParamClass):
     def __delattr__(self, attr: str) -> None:
         """Handle protection, descriptor parameters."""
         # Handle protection
-        mcs = type(type(self))
-        mcs._assert_unprotected(attr, getattr(self, PROTECTED))
+        _assert_unprotected(attr, getattr(self, PROTECTED))
 
         # Handle descriptor parameters
         if attr in getattr(self, DEFAULT):
