@@ -329,7 +329,7 @@ Before using `__slots__` with `ParamClass`, please note the following.
 
 ### Breaking `ParamClass` protection scheme
 
-There is no such thing as "perfect attribute protection" in Python. As such `ParamClass` only provides protection against natural behaviour (and even unnatural to a large extent). Below are some knonwn easy ways to break it, representing **discouraged behaviour**. If you find other elementary ways, please report them in an issue.
+There is no such thing as "perfect attribute protection" in Python. As such `ParamClass` only provides protection against natural behaviour (and even unnatural to a large extent). Below are some knonwn easy ways to break it, representing **discouraged behaviour**. If you find other elementary ways, please report them in an [issue](https://github.com/eliegoudout/paramclasses/issues).
 
 1. Modifying `@protected` -- _huh?_
 2. Modifying or subclassing `type(ParamClass)` -- requires evil dedication.
