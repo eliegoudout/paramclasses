@@ -73,7 +73,7 @@ One accesses current parameters dict and missing parameters of an instance with 
  'parameter_with_a__default_value': 'default value',
  'parameter_with_no_default_value': ?}
 >>> A().missing_params
-['parameter_with_no_default_value']
+('parameter_with_no_default_value',)
 ```
 Note that `A().a_method_turned_into_a_parameter` **is not** a _bound_ method -- see [Descriptor parameters](#descriptor-parameters).
 
@@ -83,7 +83,7 @@ Note that `A().a_method_turned_into_a_parameter` **is not** a _bound_ method -- 
 
 Say we define the following `BaseEstimator` class.
 ```python
-from paramclass import ParamClass, protected
+from paramclasses import ParamClass, protected
 
 class BaseEstimator(ParamClass):
     @protected
@@ -113,15 +113,15 @@ class A(ParamClass):
     z = 2       # Non-parameter attribute
 ```
 ```pycon
->>> A(x=0, y=1)                 # Instantiation assignments
-A(x=0)                          # Only shows non-default values
->>> A().set_params(x=0, y=2)    # `set_params` assignments
+>>> A(y=0)                      # Instantiation assignments
+A(x=?, y=0)                     # Only shows non-default values
+>>> A().set_params(x=0, y=0)    # `set_params` assignments
 >>> A().y = 1                   # Usual assignment
 >>> del A(x=0).x                # Usual deletion
 >>> A.x = 1                     # Class-level assignment/deletion works...
 >>> A()
-A(x=1)                          # ... and `A` remembers default values -- otherwise would show `A()`
->>> a.set_params(z=3)           # FAILS: Non-parameters cannot be assigned with `set_params`
+A(x=1)                          # ... and `A` remembers default values -- otherwise would show `A(x=?)`
+>>> a.set_params(z=0)           # Should FAIL: Non-parameters cannot be assigned with `set_params`
 <traceback>
 AttributeError: Invalid parameters: {'z'}. Operation cancelled
 ```
