@@ -40,9 +40,9 @@ pip install paramclasses
 
 ## 1. Rationale 👩‍🏫
 
-For a parameter-holding class (like [dataclasses](https://docs.python.org/3/library/dataclasses.html)), it is nice to embark some functionality (_e.g._ properties `params` to get a dict of parameters' `(key, value)` pairs, `missing_params` for unassigned parameter keys, ...). Inheriting them via subclassing would allows to factor out specialized functionalities with context-dependant methods (_e.g._ `fit`, `reset`, `plot`, etc...). However, such subclassing comes with a risk of attributes conflicts, especially for exposed APIs, when users do not necessarily know every "read-only" (or "**protected**") attributes from parents classes.
+For a _parameter_-holding class, like [dataclasses](https://docs.python.org/3/library/dataclasses.html), it would be nice to embark some inherited functionality -- _e.g._ `params` property to access current `(key, value)` pairs, `missing_params` for unassigned parameter keys,... Such inheritance would allow to factor out specialized functionality for context-dependant methods -- _e.g._ `fit`, `reset`, `plot`, etc... However, such subclassing comes with a risk of attributes conflicts, especially for exposed APIs, when users do not necessarily know every "read-only" (or "**protected**") attributes from base classes.
 
-To solve this problem, we propose a base `ParamClass` with a `@protected` decorator, which robustly protects any target attribute from being accidentally overriden when subclassing, at runtime. Note that `@dataclass(frozen=True)` only applies protection to instances' *parameters* and can silently override subclass assignments. Atlernatives such as [`typing.final`](https://docs.python.org/3/library/typing.html#typing.final) and [`typing.Final`](https://docs.python.org/3/library/typing.html#typing.Final) are designed for type checkers on which we do not want to rely -- from python 3.11 onwards, `final` does add a `__final__` flag when possible, but it will not affect immutable objects.
+To solve this problem, we propose a base `ParamClass` and an `@protected` decorator, which robustly protects any target attribute from being accidentally overriden when subclassing, at runtime. Note that `@dataclass(frozen=True)` only applies protection to instances' parameters and can silently override base class assignments. Atlernatives such as [`typing.final`](https://docs.python.org/3/library/typing.html#typing.final) and [`typing.Final`](https://docs.python.org/3/library/typing.html#typing.Final) are designed for type checkers on which we do not want to rely -- from python 3.11 onwards, `final` does add a `__final__` flag when possible, but it will not affect immutable objects.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
@@ -326,7 +326,7 @@ paramclasses.paramclasses.ProtectedError: Incoherent protection inheritance for 
 
 Before using `__slots__` with `ParamClass`, please note the following.
 
-1. Since the _parameters_ get/set/delete interactions **bypass** descriptors, using `__slots__` on them **will not** yield the usual behaviour.
+1. Since parameters' get/set/delete interactions **bypass** descriptors, using `__slots__` on them **will not** yield the usual behaviour.
 2. You **cannot** slot a previously _protected_ attribute -- since it would require replacing its value with a [member object](https://docs.python.org/3/howto/descriptor.html#member-objects-and-slots).
 3. Since `ParamClass` does not use `__slots__`, any of its subclasses will still have a `__dict__`.
 4. The overhead from `ParamClass` functionality, although not high, probably nullifies any `__slots__` optimization in most use cases.
