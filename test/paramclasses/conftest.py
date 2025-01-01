@@ -1,4 +1,4 @@
-"""Pytest root configuration."""
+"""Paramclasses global pytest configuration."""
 
 from collections.abc import Callable
 from itertools import chain, product
