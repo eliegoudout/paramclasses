@@ -37,6 +37,10 @@ MISSING = _MissingType("?")  # Sentinel object better representing missing value
 class _ProtectedType:
     val: object
 
+    # See github.com/eliegoudout/paramclasses/issues/3
+    def __new__(cls, *_: object, **__: object):  # noqa: ANN204  # No `Self` in 3.10
+        return super().__new__(cls)
+
 
 def protected(val: object) -> _ProtectedType:
     """Make read-only with this decorator, including in subclasses.

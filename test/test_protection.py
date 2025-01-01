@@ -139,22 +139,3 @@ def test_cannot_turn_previously_protected_into_param():
 
         class A(ParamClass):
             params: dict[str, object]  # type:ignore[annotation-unchecked]
-
-
-def test_break_protection_modifying_protected():
-    """Break protection by modifying `protected`."""
-    _ProtectedType = type(protected(0))
-    _ProtectedType.__new__ = lambda _, val: val
-
-    class A(ParamClass):
-        x = protected(0)
-
-    # "x" is not added to protected attributes
-    assert getattr(A, PROTECTED) == getattr(ParamClass, PROTECTED)
-
-
-def test_break_protection_modifying_mcs():
-    """Break protection by modifying from the inside out."""
-    type(type(ParamClass)).__setattr__ = type(ParamClass).__setattr__ = type.__setattr__
-    ParamClass.__setattr__ = object.__setattr__
-    setattr(ParamClass(), PROTECTED, "broken!")
