@@ -40,7 +40,11 @@ pip install paramclasses
 
 ## 1. Rationale 👩‍🏫
 
-For a _parameter_-holding class, like [dataclasses](https://docs.python.org/3/library/dataclasses.html), it would be nice to embark some inherited functionality -- _e.g._ `params` property to access current `(key, value)` pairs, `missing_params` for unassigned parameter keys,... Such inheritance would allow to factor out specialized functionality for context-dependant methods -- _e.g._ `fit`, `reset`, `plot`, etc... However, such subclassing comes with a risk of attributes conflicts, especially for exposed APIs, when users do not necessarily know every "read-only" (or "**protected**") attributes from base classes.
+###### Parameter-holding classes vs. inheritance...
+
+For a _parameter_-holding class, like [dataclasses](https://docs.python.org/3/library/dataclasses.html), it would be nice to embark some inherited functionality -- _e.g._ `params` property to access current `(key, value)` pairs, `missing_params` for unassigned parameter keys,... Such inheritance would allow to factor out specialized functionality for context-dependant methods -- _e.g._ `fit`, `reset`, `plot`, etc... However, such subclassing comes with a risk of attributes conflicts, especially for libraries or exposed APIs, when users do not necessarily know every "read-only" (or "**protected**") attributes from base classes.
+
+###### Our solution 😌
 
 To solve this problem, we propose a base `ParamClass` and an `@protected` decorator, which robustly protects any target attribute from being accidentally overriden when subclassing, at runtime. Note that `@dataclass(frozen=True)` only applies protection to instances' parameters and can silently override base class assignments. Atlernatives such as [`typing.final`](https://docs.python.org/3/library/typing.html#typing.final) and [`typing.Final`](https://docs.python.org/3/library/typing.html#typing.Final) are designed for type checkers on which we do not want to rely -- from python 3.11 onwards, `final` does add a `__final__` flag when possible, but it will not affect immutable objects.
 
@@ -105,7 +109,7 @@ Then, we are [guaranteed](#breaking-paramclass-protection-scheme) that no subcla
 paramclasses.paramclasses.ProtectedError: Attribute 'fit' is protected
 ```
 
-This **runtime** protection can be applied to all attributes -- with `protected(value)` --, methods, properties, etc... during class definition but [not after](#post-creation-protection). It is "robust" in the sense that breaking the designed behaviour, though possible, requires -- to our knowledge -- [obscure patterns](#breaking-paramclass-protection-scheme).
+This **runtime** protection can be applied to all methods, properties, attributes -- with `protected(value)` --, etc... during class definition but [not after](#post-creation-protection). It is "robust" in the sense that breaking the designed behaviour, though possible, requires -- to our knowledge -- [obscure patterns](#breaking-paramclass-protection-scheme).
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
@@ -216,11 +220,11 @@ getattr(ParamClass, PROTECTED)  # frozenset({'params', '__getattribute__', '__pa
 # Works on subclasses and instances too
 ```
 
-Finally, when subclassing an external `Parent` class, one can check whether it is a paramclass with `isparamclass`.
+Finally, when subclassing an external `UnknownClass`, one can check whether it is a paramclass with `isparamclass`.
 ```python
 from paramclasses import isparamclass
 
-isparamclass(Parent)  # Returns a boolean
+isparamclass(UnknownClass)  # Returns a boolean
 ```
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
@@ -275,9 +279,9 @@ TypeError: 'list' object cannot be interpreted as an integer
 <bound method cumsum of <__main__.NonParamAggregator object at 0x13a10e7a0>>
 ```
 
-Note how `NonParamAggregator().aggregator` is a **bound** method. What happened here is that since `np.cumsum` is a [descriptor](https://docs.python.org/3/howto/descriptor.html) -- like all `function`, `property` or `member_descriptor` objects for example --, the function `np.cumsum(a, axis=None, dtype=None, out=None)` interpreted `NonParamAggregator()` to be the array `a`, and `[0, 1, 2]` to be the `axis`.
+Note how `NonParamAggregator().aggregator` is a **bound** method. What happened here is that since `np.cumsum` is a data [descriptor](https://docs.python.org/3/howto/descriptor.html) -- like all `function`, `property` or `member_descriptor` objects for example --, the function `np.cumsum(a, axis=None, dtype=None, out=None)` interpreted `NonParamAggregator()` to be the array `a`, and `[0, 1, 2]` to be the `axis`.
 
-To avoid this kind of surprises we chose, **for instances' parameters only**, to bypass the get/set/delete descriptor-specific behaviours, and treat them as _usual_ attributes. Contrary to [dataclasses](https://docs.python.org/3/library/dataclasses.html), by also bypassing descriptors for set/delete operations, we allow property-valued parameters, for example.
+To avoid this kind of surprises we chose, **for parameters only**, to bypass the get/set/delete descriptor-specific behaviours, and treat them as _usual_ attributes. Contrary to [dataclasses](https://docs.python.org/3/library/dataclasses.html), by also bypassing descriptors for set/delete operations, we allow property-valued parameters, for example.
 ```python
 class A(ParamClass):
     x: property = property(lambda _: ...)  # Should WORK
