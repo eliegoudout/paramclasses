@@ -175,6 +175,27 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
         return super().__new__(mcs, name, bases, namespace_final)
 
+    def __getattribute__(cls, attr: str) -> object:
+        """Handle descriptor parameters."""
+        vars_cls = super().__getattribute__("__dict__")
+
+        # Special case `__dict__`
+        if attr == "__dict__":
+            return vars_cls
+
+        # Not a parameter, normal look-up
+        if attr not in vars_cls[DEFAULT]:
+            return super().__getattribute__(attr)
+
+        # Parameters bypass descriptor
+        for vars_base in chain((vars_cls,), map(vars, cls.__mro__[1:])):
+            if attr in vars_base:
+                return vars_cls[attr]
+
+        # Not found
+        msg = f"type object '{cls.__name__}' has no attribute '{attr}'"
+        raise AttributeError(msg)
+
     def __setattr__(cls, attr: str, val_potentially_protected: object) -> None:
         """Handle protection, missing value."""
         _assert_unprotected(attr, getattr(cls, PROTECTED))
@@ -312,7 +333,7 @@ class ParamClass(metaclass=_MetaParamClass):
         cls = type(self)
         vars_self = super().__getattribute__("__dict__")
 
-        # Special case __dict__, which is protected
+        # Special case `__dict__`, which is protected
         if attr == "__dict__":  # To save a few statements
             if attr in vars_self:
                 del vars_self[attr]
@@ -322,16 +343,20 @@ class ParamClass(metaclass=_MetaParamClass):
         if attr in vars_self and attr in getattr(cls, PROTECTED):
             del vars_self[attr]
 
+        # Not a parameter, normal look-up
         if attr not in getattr(cls, DEFAULT):
             return super().__getattribute__(attr)
 
-        # Handle descriptor parameters
+        # Parameters bypass descriptor
         # https://docs.python.org/3/howto/descriptor.html#invocation-from-an-instance
         if attr in vars_self:
             return vars_self[attr]
+
         for base in cls.__mro__:
             if attr in vars(base):
                 return vars(base)[attr]
+
+        # Not found
         msg = f"'{cls.__name__}' object has no attribute '{attr}'"
         raise AttributeError(msg)
 
