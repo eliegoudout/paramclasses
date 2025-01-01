@@ -4,8 +4,15 @@ version = "0.1.0"
 description = "Parameter-holding classes with robust subclassing protection"
 readme = "README.md"
 license = {file = "LICENSE"}
-requires-python = ">=3.10"
+requires-python = ">=3.10, <3.14"
 dependencies = []
+
+[dependency-groups]
+dev = [
+    "mypy>=1.14.0",
+    "pytest>=8.3.4",
+    "pytest-cov>=6.0.0",
+]
 
 
 [tool.ruff]
@@ -16,13 +23,13 @@ select = ["ALL"]
 
 [tool.ruff.lint.per-file-ignores]
 "test/**/*.py" = [
-    "ANN001",                   # No need for tests arguments type
-    "INP001",                   # Test directories are not namespace packages
-    "N802", "N803", "N806",     # Fixtures and variables may represent classes
-    "S101",                     # Pytest tests can use `assert`
+    "ANN001",                # No need for tests arguments type
+    "INP001",                # Test directories are not namespace packages
+    "N802", "N803", "N806",  # Fixtures and variables may be capitalized
+    "S101",                  # Pytest tests can use `assert`
 ]
 "test/**/test_*.py" = [
-    "ANN201",   # No need for tests return type
+    "ANN201",                # No need for tests return type
 ]
 
 [tool.ruff.format]
@@ -42,9 +49,6 @@ addopts = [
 ]
 
 
-[dependency-groups]
-dev = [
-    "mypy>=1.14.0",
-    "pytest>=8.3.4",
-    "pytest-cov>=6.0.0",
-]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

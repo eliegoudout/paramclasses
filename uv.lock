@@ -147,7 +147,7 @@ wheels = [
 [[package]]
 name = "paramclasses"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 
 [package.dev-dependencies]
 dev = [

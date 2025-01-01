@@ -30,9 +30,14 @@ jobs:
       - name: Run mypy
         run: |
           uv run mypy
+      - name: Building
+        run: |
+          uv build
+      - name: Installing
+        run: |
+          uv pip install dist/paramclasses-*-py3-none-any.whl
       - name: Run pytest with coverage
         run: |
-          uv pip install -e .
           uv run pytest --cov-report=xml
       - name: Upload coverage report to Codecov
         uses: codecov/codecov-action@v5
