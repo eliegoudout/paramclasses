@@ -1,4 +1,4 @@
-"""Extensive testing should be added soon."""
+"""Miscellaneous tests not directly related to protection."""
 
 import random
 import re
@@ -8,19 +8,19 @@ import pytest
 from paramclasses import MISSING, ParamClass, isparamclass
 
 
-def test_slot_compatible():
+def test_slot_compatible(null):
     """It is possible to slot unprotected attribute."""
 
     class A(ParamClass):
         __slots__ = ("x",)
 
     a = A()
-    null = object()
     a.x = null
     assert a.x is null
     assert "x" not in vars(a)
 
 
+@pytest.mark.skip(reason="Don't want to monkeypatch, treat #4 before")
 def test_repr_with_missing_and_recursion(ParamTest):
     """Show non-default and missing in `repr`, handle recursive."""
 
@@ -44,8 +44,22 @@ def test_repr_with_missing_and_recursion(ParamTest):
 def test_missing_params(ParamTest, paramtest_attrs):
     """Test `missing_params` property."""
     paramtest_missing = sorted(ParamTest().missing_params)
-    expected = sorted(paramtest_attrs("nodefaultvalue"))
+    expected = sorted(paramtest_attrs("missing"))
     assert expected == paramtest_missing
+
+
+def test_repr_replace_above_while_issue_4() -> None:
+    """String representation, with missing value and recursion."""
+
+    class A(ParamClass):
+        a = 0
+        b: int = 1
+        c: int
+        d: type
+
+    x = A(b=2)
+    x.c = x
+    assert repr(x) == "A(b=2, c=..., d=?)"
 
 
 def test_cannot_define_double_dunder_parameter():
@@ -83,63 +97,15 @@ def test_cannot_assign_special_missing_value(ParamTest, paramtest_attrs):
             setattr(ParamTest(), attr, MISSING)
 
 
-def test_can_get_set_del_unprotected_class_level(
-    ParamTest,
-    test_get_set_del_work,
-    paramtest_attrs,
-):
-    """Check possible get/set/del at class-level."""
-    for attr in paramtest_attrs("unprotected"):
-        test_get_set_del_work(ParamTest, attr)
-
-
-def test_can_get_set_del_unprotected_instance_level(
-    ParamTest,
-    test_get_set_del_work,
-    paramtest_attrs,
-):
-    """Check that every unprotected attribute can be get/set/del."""
-    instance = ParamTest()
-    tested = []
-    # Parameter bypass descriptor mechanisms
-    for attr in paramtest_attrs("unprotected", "parameter"):
-        test_get_set_del_work(instance, attr)
-        tested.append(attr)
-
-    # Non-parameters need special descriptor care
-    for attr in paramtest_attrs("unprotected", "nonparameter"):
-        clsval = getattr(ParamTest, attr, MISSING)
-        has_get = hasattr(clsval, "__get__")
-        has_set = hasattr(clsval, "__set__")
-        has_del = hasattr(clsval, "__delete__")
-
-        # Find expected value knowing descriptor behaviour
-        if not has_get and (has_set or has_del):
-            expected = clsval
-        elif has_get and not has_set and has_del:
-            expected = clsval.val
-        else:
-            expected = MISSING
-
-        test_get_set_del_work(
-            ParamTest(),
-            attr,
-            skip_set=has_del and not has_set,
-            skip_del=has_set and not has_del,
-            expected=expected,
-        )
-
-
-def test_set_params_works(ParamTest, paramtest_attrs):
+def test_set_params_works(ParamTest, paramtest_attrs, null):
     """For parameters, `set_params` works fine."""
-    null = object()
     instance = ParamTest()
     param_values = {attr: null for attr in paramtest_attrs("unprotected", "parameter")}
     instance.set_params(**param_values)
     assert all(getattr(instance, attr) is null for attr in param_values)
 
 
-def test_params(ParamTest, paramtest_attrs):
+def test_params(ParamTest, paramtest_attrs, null):
     """Test `params` property.
 
     Half randomly chosen parameters are assigned a `null` value before.
@@ -148,7 +114,6 @@ def test_params(ParamTest, paramtest_attrs):
     unprotected = paramtest_attrs("unprotected", "parameter")
     assigned_null = random.sample(unprotected, len(unprotected) // 2)
 
-    null = object()
     instance = ParamTest()
     parameters = paramtest_attrs("parameter")
     expected = {attr: getattr(ParamTest, attr, MISSING) for attr in parameters}

@@ -1,18 +1,28 @@
 """Paramclasses global pytest configuration."""
 
-from collections.abc import Callable
-from itertools import chain, product
+import inspect
+from collections.abc import Callable, Iterable
+from itertools import chain, pairwise, product
+from types import MappingProxyType
+from typing import Literal
 
 import pytest
 
 from paramclasses import MISSING, ParamClass, ProtectedError, protected
+from paramclasses.paramclasses import _unprotect
 
 
 @pytest.fixture(scope="session")
-def test_set_del_is_protected() -> Callable:
+def unprotect() -> Callable:
+    """Unprotect the @protected`."""
+    return lambda val: _unprotect(val)[0]
+
+
+@pytest.fixture(scope="session")
+def assert_set_del_is_protected() -> Callable:
     """Test protection against `setattr` and `delattr`."""
 
-    def _test_set_del_is_protected(obj: object, attr: str, regex: str) -> None:
+    def _assert_set_del_is_protected(obj: object, attr: str, regex: str) -> None:
         """Test protection against `setattr` and `delattr`."""
         # Cannot assign
         with pytest.raises(ProtectedError, match=regex):
@@ -22,7 +32,7 @@ def test_set_del_is_protected() -> Callable:
         with pytest.raises(ProtectedError, match=regex):
             delattr(obj, attr)
 
-    return _test_set_del_is_protected
+    return _assert_set_del_is_protected
 
 
 @pytest.fixture(scope="session")
@@ -59,58 +69,59 @@ def test_get_set_del_work() -> Callable:
 
 
 @pytest.fixture(scope="session")
-def DescriptorFactories() -> dict[tuple[bool, bool, bool], type]:
+def DescriptorFactories() -> dict[tuple[bool, ...], type]:
     """All 8 descriptor (or not) factories."""
 
-    class Filter(type):
-        """Removes get/set/delete if required."""
+    class UsedGet(AttributeError): ...  # noqa: N818
 
-        def __new__(  # noqa: PLR0913
-            mcs,  # noqa: N804
-            name,
-            bases,
-            namespace,
-            *,
-            has_get,
-            has_set,
-            has_delete,
-        ) -> type:
-            methods = []
-            for attr, keep in zip(
-                ["__get__", "__set__", "__delete__"],
-                [has_get, has_set, has_delete],
-                strict=True,
-            ):
-                if keep:
-                    methods.append(attr)
-                else:
-                    del namespace[attr]
+    class UsedSet(AttributeError): ...  # noqa: N818
 
-            methods_str = "".join(attr[2:-2].title() for attr in methods) or "None"
-            name = f"DescriptorFactoryWith{methods_str}"
-            namespace["__qualname__"] = name
-            return super().__new__(mcs, name, bases, namespace)
+    class UsedDelete(AttributeError): ...  # noqa: N818
 
-    _DescriptorFactories: dict[tuple[bool, bool, bool], type] = {}
-    for has_get, has_set, has_delete in product([True, False], repeat=3):
+    def desc(obj) -> str:
+        """To make error message comparable, no address."""
+        if inspect.isclass(obj):
+            return f"<class {obj.__name__}>"
+        return f"<instance of {type(obj).__name__}>"
 
-        class _DescriptorFactory(
-            metaclass=Filter,
-            has_get=has_get,
-            has_set=has_set,
-            has_delete=has_delete,
-        ):
-            val = object()
+    def get_method(self, obj, type: type) -> None:  # noqa: A002
+        msg = f"Used __get__(self: {desc(self)}, obj: {desc(obj)}, type: {desc(type)})"
+        raise UsedGet(msg)
 
-            def __get__(self, obj, objtype=None) -> object:
-                return self if obj is None else self.val
+    def set_method(self, obj, val) -> None:
+        msg = f"Used __set__(self: {desc(self)}, obj: {desc(obj)}, value: {desc(val)})"
+        raise UsedGet(msg)
 
-            def __set__(self, obj, val) -> None:
-                self.val = val
+    def delete_method(self, obj) -> None:
+        msg = f"Used __delete__(self: {desc(self)}, obj: {desc(obj)})"
+        raise UsedGet(msg)
 
-            def __delete__(self, obj) -> None: ...
+    _DescriptorFactories: dict[tuple[bool, ...], type] = {}
+    attrs = ("__get__", "__set__", "__delete__")
+    methods = (get_method, set_method, delete_method)
+    for has_methods in product([True, False], repeat=3):
+        namespace = {
+            attr: method
+            for attr, method, has_method in zip(
+                attrs,
+                methods,
+                has_methods,
+                strict=False,
+            )
+            if has_method
+        }
+        methods_str = (
+            "".join(
+                attr[2:-2].title()
+                for attr, has_method in zip(attrs, has_methods, strict=False)
+                if has_method
+            )
+            or "Non"
+        )
+        factory_name = f"{methods_str}DescriptorFactory"
 
-        _DescriptorFactories[has_get, has_set, has_delete] = _DescriptorFactory
+        _DescriptorFactories[has_methods] = type(factory_name, (), namespace)
+
     return _DescriptorFactories
 
 
@@ -125,7 +136,7 @@ AttributesWithFlags = tuple[str, tuple[bool, ...]]
 def paramtest_attrs_no_value() -> tuple[AttributesWithFlags, ...]:
     """For non-valued attributes, `(attr, (is_slot, is_parameter))`."""
     return (
-        ("a_unprotected_parameter_with_nodefaultvalue", (False, True)),
+        ("a_unprotected_parameter_with_missing", (False, True)),
         ("a_unprotected_parameter_slot", (True, True)),
         ("a_unprotected_nonparameter_slot", (False, False)),
     )
@@ -148,18 +159,30 @@ def paramtest_attrs_with_value() -> tuple[AttributesWithFlags, ...]:
             "_delete" if has_delete else "",
         )
         if not any(has_methods):
-            attr += "_none"
+            attr += "_nondescriptor"
 
         out.append((attr, flags))
 
     return tuple(out)
 
 
-@pytest.fixture(scope="session")
-def attrs_filter() -> Callable[[tuple[str], str], tuple[str, ...]]:
-    """Filter factory attribute collection with expressions."""
+FilterMode = Literal["and", "or", "none"]
 
-    def keep_attr(attr, *expr: str, mode: str) -> bool:
+
+@pytest.fixture(scope="session")
+def attrs_filter() -> Callable[[tuple[str, ...], str, FilterMode], tuple[str, ...]]:
+    """Filter factory attribute collection with expressions.
+
+    Arguments:
+        attrs (tuple[str, ...]): Tuple of factory attribute names.
+        *exprs (str): Expressions to be matched exactly for filtering.
+        mode (FilterMode): Mode to pass filter, "and" means all filter
+            must be matched, "or" means at least one and "none" means
+            none.
+
+    """
+
+    def keep_attr(attr, *expr: str, mode: FilterMode) -> bool:
         """Exact match, trailing or between "_"."""
         in_attr = set(attr.split("_"))
         in_expr = set(expr)
@@ -174,9 +197,9 @@ def attrs_filter() -> Callable[[tuple[str], str], tuple[str, ...]]:
         raise ValueError(msg)
 
     def _attrs_filter(
-        attrs: tuple[str],
+        attrs: tuple[str, ...],
         *expr: str,
-        mode: str = "and",
+        mode: FilterMode = "and",
     ) -> tuple[str, ...]:
         """Filter factory attribute collection with expressions."""
         if not expr:
@@ -210,27 +233,16 @@ def paramtest_attrs(
     return _paramtest_attrs_filter
 
 
-@pytest.fixture
-def ParamTest(
+@pytest.fixture(scope="session")
+def paramtest_namespace(
     DescriptorFactories,
     paramtest_attrs_no_value,
     paramtest_attrs_with_value,
-) -> type[ParamClass]:
-    """Fixture paramclass with all kinds of attributes.
-
-    Dynamically created paramclass. By "all kinds" we mean regarding
-    combinations of being slot/valued/protected/parameter and having
-    get/set/delete methods.
-    """
+) -> MappingProxyType:
+    """Namespace for class fixtures."""
+    # Non-valued attributes
     slots: list[str] = []
     annotations: dict[str, object] = {}
-    namespace = {
-        "__annotations__": annotations,
-        "__slots__": slots,
-        "__module__": __name__,
-    }
-
-    # Non-valued attributes
     for attr, (is_slot, is_parameter) in paramtest_attrs_no_value:
         if is_slot:
             slots.append(attr)
@@ -238,6 +250,7 @@ def ParamTest(
             annotations[attr] = ...
 
     # Valued attributes
+    namespace: dict[str, object] = {}
     for attr, (is_protected, is_parameter, *has_methods) in paramtest_attrs_with_value:
         # Generate descriptor and protect if required
         val = DescriptorFactories[tuple(has_methods)]()
@@ -249,4 +262,173 @@ def ParamTest(
         # Add to factory_dict
         namespace[attr] = val
 
-    return type(ParamClass)("ParamTest", (ParamClass,), namespace)
+    # Make it essentially immutable -- modulo descriptors immutability
+    namespace["__annotations__"] = MappingProxyType(annotations)
+    namespace["__slots__"] = tuple(slots)
+    namespace["__module__"] = __name__
+    return MappingProxyType(namespace)
+
+
+@pytest.fixture
+def ParamTest(paramtest_namespace) -> type[ParamClass]:
+    """Fixture paramclass with all kinds of attributes.
+
+    Dynamically created paramclass. By "all kinds" we mean regarding
+    combinations of being slot/valued/protected/parameter and having
+    get/set/delete methods.
+    """
+    return type(ParamClass)("ParamTest", (ParamClass,), dict(paramtest_namespace))
+
+
+@pytest.fixture
+def VanillaTest(paramtest_namespace, unprotect) -> type:
+    """Analogue to `ParamTest` for vanilla classes."""
+    # Unprotect and enable dict
+    namespace = {attr: unprotect(val) for attr, val in paramtest_namespace.items()}
+    namespace["__slots__"] = namespace["__slots__"] + ("__dict__",)
+    return type("VanillaTest", (), namespace)
+
+
+@pytest.fixture
+def obj(
+    paramtest_attrs,
+    ParamTest,
+    VanillaTest,
+) -> object:
+    """Object of Vanilla or Param classes, with dict filled or not."""
+
+    def _obj(kind: Literal["Param", "Vanilla"], *, fill_dict: bool = False) -> object:
+        if kind == "Param":
+            instance = ParamTest()
+        elif kind == "Vanilla":
+            instance = VanillaTest()
+        else:
+            msg = f"Invalid class kind '{kind}'"
+            raise ValueError(msg)
+
+        if not fill_dict:
+            return instance
+
+        # Fill vars(instance) manually
+        for attr in chain(paramtest_attrs()):
+            vars(instance)[attr] = None
+
+        return instance
+
+    return _obj
+
+
+@pytest.fixture(scope="session")
+def assert_same_behaviour() -> Callable:
+    """Test whether all `obj` behave similarly for `attr`.
+
+    WARNING: By iteracting with `ops`, objects or their classes may be
+    modified.
+
+    Arguments:
+        *objs (object): Objects whose behaviour is compared.
+        attr (str): The attribute to get / set / delete.
+        ops (str | tuple[str, ...]): One or more operations to execute
+            one after the other. Each in `{"get", "set", "delete"}`.
+
+    """
+
+    def _assert_iter_consistency(
+        iterable: Iterable,
+        *,
+        desc: str = "",
+        ctxt: str | Callable = "",
+        mode: Literal["eq", "is"],
+    ) -> object:
+        """Check coherence along iterable and returns last value."""
+        static = isinstance(ctxt, str)
+
+        for i, (obj1, obj2) in enumerate(pairwise(iterable)):
+            msg = f"{desc}. Context: {ctxt if static else '{}'}"
+            if mode == "eq":
+                assert obj1 == obj2, msg if static else msg.format(ctxt(i))  # type: ignore[operator]
+            elif mode == "is":
+                assert obj1 is obj2, msg if static else msg.format(ctxt(i))  # type: ignore[operator]
+            else:
+                msg = f"Invalid mode '{mode}' for '_assert_iter_consistency'"
+                raise ValueError(msg)
+
+        return obj2
+
+    OP = Literal["get", "set", "delete"]
+
+    def _assert_same_behaviour(
+        *objs: object,
+        attr: str,
+        ops: OP | tuple[OP, ...],
+    ) -> None:
+        if len(objs) <= 1:
+            msg = "At least 2 objects required"
+            raise ValueError(msg)
+
+        # Objects should all be classes or all objects
+        are_classes = _assert_iter_consistency(
+            map(inspect.isclass, objs),
+            mode="eq",
+            desc="Inconsistent 'isclass' flags",
+            ctxt=lambda i: f"{objs[i]}, {objs[i+1]}",
+        )
+
+        if isinstance(ops, str):
+            ops = (ops,)
+
+        null = object()
+        do = {
+            "get": getattr,
+            "set": lambda obj, attr: setattr(obj, attr, null),
+            "delete": delattr,
+        }
+        assert set(ops).issubset(do), f"Invalid ops: {ops}"
+
+        # Collect behaviour
+        collected: tuple[list, ...] = tuple([] for _ in objs)
+        for (i, obj), op in product(enumerate(objs), ops):
+            # Unify classname before collecting, to unify error messages.
+            cls: type = obj if are_classes else type(obj)  # type: ignore[assignment]
+            name = cls.__name__
+            qualname = cls.__qualname__
+            cls.__qualname__ = "UniqueQualnameClass"
+            cls.__name__ = "UniqueNameClass"
+            try:
+                collected[i].append((name, False, do[op](obj, attr)))
+            except AttributeError as e:
+                collected[i].append((name, True, f"{type(e).__name__}: {e}"))
+            cls.__qualname__ = qualname
+            cls.__name__ = name
+
+        # Loop through ops
+        for i, collected_op in enumerate(zip(*collected, strict=False)):
+            names, exception_flags, blueprints = zip(*collected_op, strict=False)
+            ctxt = lambda j: f"attr='{attr}' | classes: {names[j]}, {names[j+1]}"  # noqa: B023, E731
+            ops_str = f"'{' > '.join(ops[:i+1])}'"
+            # All exceptions or none
+            are_exceptions = _assert_iter_consistency(
+                exception_flags,
+                mode="eq",
+                desc=f"Inconsistent 'is_exception' flags after {ops_str}",
+                ctxt=ctxt,
+            )
+
+            if are_exceptions:
+                # Check exception is the same
+                _ = _assert_iter_consistency(
+                    blueprints,
+                    mode="eq",
+                    desc=f"Inconsistent exceptions after {ops_str}",
+                    ctxt=ctxt,
+                )
+            else:
+                # Check result is the same
+                _ = _assert_iter_consistency(
+                    blueprints,  # outputs
+                    mode="is",
+                    desc=f"Inconsistent outputs after {ops_str}",
+                    ctxt=ctxt,
+                )
+
+    return _assert_same_behaviour

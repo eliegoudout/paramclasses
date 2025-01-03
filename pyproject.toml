@@ -30,6 +30,7 @@ select = ["ALL"]
 ]
 "test/**/test_*.py" = [
     "ANN201",                # No need for tests return type
+    "PLR0913",               # Many fixtures needed sometimes
 ]
 
 [tool.ruff.format]
