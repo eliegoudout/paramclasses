@@ -392,7 +392,9 @@ class ParamClass(metaclass=_MetaParamClass):
 
         # Handle descriptor parameters
         if attr in getattr(self, DEFAULT):
-            del vars(self)[attr]
+            if attr not in (vars_self := vars(self)):
+                raise AttributeError(attr)
+            del vars_self[attr]
         else:
             super().__delattr__(attr)
 
