@@ -330,9 +330,9 @@ paramclasses.paramclasses.ProtectedError: Incoherent protection inheritance for 
 
 Before using `__slots__` with `ParamClass`, please note the following.
 
-1. Since parameters' get/set/delete interactions **bypass** descriptors, using `__slots__` on them **will not** yield the usual behaviour.
+1. Currently paramclasses do not use `__slots__`, so any of its subclasses will still have a `__dict__`. _More on that in the future..._
 2. You **cannot** slot a previously _protected_ attribute -- since it would require replacing its value with a [member object](https://docs.python.org/3/howto/descriptor.html#member-objects-and-slots).
-3. Since `ParamClass` does not use `__slots__`, any of its subclasses will still have a `__dict__`.
+3. Since parameters' get/set/delete interactions **bypass** descriptors, using `__slots__` on them **will not** yield the usual behaviour.
 4. The overhead from `ParamClass` functionality, although not high, probably nullifies any `__slots__` optimization in most use cases.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
