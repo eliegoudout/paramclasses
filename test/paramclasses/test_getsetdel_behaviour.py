@@ -5,18 +5,19 @@ This is done according to the following expectations, in three sections:
     - Vanilla behaviour
     - Bypass Descriptors behaviour
 
-          ╔══════════════════════════════════════╦═════════════════════════════════════╗
-          ║               Parameters             ║             Non-Parameters          ║
- EXPECTED ╠═══════════════════╤══════════════════╬══════════════════╤══════════════════╣
-BEHAVIOUR ║     Protected     │   Unprotected    ║    Protected     │   Unprotected    ║
-╔═════════╬═══════════════════╪══════════════════╬══════════════════╪══════════════════╢
-║ getattr ║Bypass Descriptors*│Bypass Descriptors║     Vanilla*     │     Vanilla      ║
-╟─────────╫───────────────────│──────────────────╫──────────────────│──────────────────╢
-║ setattr ║  ProtectedError   │Bypass Descriptors║  ProtectedError  │     Vanilla      ║
-╟─────────╫───────────────────│──────────────────╫──────────────────│──────────────────╢
-║ delattr ║  ProtectedError   │Bypass Descriptors║  ProtectedError  │     Vanilla      ║
-╚═════════╩═══════════════════╧══════════════════╩══════════════════╧══════════════════╝
-Vanilla means "same outputs or same error type and message than vanilla class".
+          ╭──────────────────────────────────────┬─────────────────────────────────────╮
+   IMPLEM │               Parameters             │             Non-Parameters          │
+ EXPECTED ├───────────────────┬──────────────────┤──────────────────┬──────────────────┤
+BEHAVIOUR │     Protected     │   Unprotected    │    Protected     │   Unprotected    │
+╭─────────┼───────────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ getattr │Bypass Descriptors*│Bypass Descriptors│     Vanilla*     │     Vanilla      │
+├─────────┼───────────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ setattr │  ProtectedError   │Bypass Descriptors│  ProtectedError  │     Vanilla      │
+├─────────┼───────────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ delattr │  ProtectedError   │Bypass Descriptors│  ProtectedError  │     Vanilla      │
+╰─────────┴───────────────────┴──────────────────┴──────────────────┴──────────────────╯
+
+Vanilla means "same outputs or same error typeS and messageS as vanilla classes".
 The * means that `get` should ignore and remove any `vars(instance)` entry. We don't
     check for the warning.
 

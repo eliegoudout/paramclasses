@@ -21,6 +21,7 @@ pip install paramclasses
     - [Defining a _paramclass_](#defining-a-paramclass)
     - [Protecting attributes with `@protected`](#protecting-attributes-with-protected)
     - [Seamless attributes interactions](#seamless-attributes-interactions)
+    - [Expected `getattr`, `setattr` and `delattr` behaviour](#expected-getattr-setattr-and-delattr-behaviour)
     - [Additional functionalities](#additional-functionalities)
         - [Callback on parameters updates](#callback-on-parameters-updates)
         - [Instantiation logic with `__post_init__`](#instantiation-logic-with-__post_init__)
@@ -135,6 +136,51 @@ A(x=1)                          # ... and `A` remembers default values -- otherw
 <traceback>
 AttributeError: Invalid parameters: {'z'}. Operation cancelled
 ```
+
+### Expected `getattr`, `setattr` and `delattr` behaviour
+
+<table>
+  <caption>Table of Expected Behaviour</caption>
+  <tr>
+    <th rowspan="2">Operation on<br><code>Class</code> or <code>instance</code></th>
+    <th colspan="2">Parameters</th>
+    <th colspan="2">Non-Parameters</th>
+  </tr>
+  <tr>
+    <!-- <th>EXPECTED</th> -->
+    <th>Protected</th>
+    <th>Unprotected</th>
+    <th>Protected</th>
+    <th>Unprotected</th>
+  </tr>
+  <tr>
+    <!-- <td rowspan="3">BEHAVIOUR</td> -->
+    <td><code>getattr</code></td>
+    <td>Bypass Descriptors*</td>
+    <td>Bypass Descriptors</td>
+    <td>Vanilla*</td>
+    <td>Vanilla</td>
+  </tr>
+  <tr>
+    <td><code>setattr</code></td>
+    <td><code>ProtectedError</code></td>
+    <td>Bypass Descriptors</td>
+    <td><code>ProtectedError</code></td>
+    <td>Vanilla</td>
+  </tr>
+  <tr>
+    <td><code>delattr</code></td>
+    <td><code>ProtectedError</code></td>
+    <td>Bypass Descriptors</td>
+    <td><code>ProtectedError</code></td>
+    <td>Vanilla</td>
+  </tr>
+</table>
+*<sub>On <code>instance</code>, <code>getattr</code> should ignore and remove any <code>vars(instance)</code> entry.</sub>
+
+_Vanilla_ means that there should be no discernable difference compared to standard classes.
+
+<sup>Back to [Table of Contents](#readme)👆</sup>
 
 ### Additional functionalities
 
@@ -256,7 +302,7 @@ A(x=2)                  # Second protection did fail
 
 ### Descriptor parameters
 
-**TLDR**: using descriptors for parameter values **is fine** _if you know what to expect_.
+**TLDR**: using descriptors for parameter values **is fine** _if you know [what to expect](#expected-getattr-setattr-and-delattr-behaviour)_.
 ```python
 import numpy as np
 
