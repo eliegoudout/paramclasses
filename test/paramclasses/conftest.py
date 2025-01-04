@@ -333,45 +333,44 @@ def assert_same_behaviour() -> Callable:
 
     """
 
-    def _assert_iter_consistency(
+    def _assert_consistency(
         iterable: Iterable,
         *,
         desc: str = "",
-        ctxt: str | Callable = "",
-        mode: Literal["eq", "is"],
+        ctxt: Callable[[int], object] | None = None,
+        mode: Literal["==", "is"],
     ) -> object:
-        """Check coherence along iterable and returns last value."""
-        static = isinstance(ctxt, str)
+        """Check `==` or `is' along iterable and return last value."""
+        msg_ = f"Inconsistency: {desc}" + (". Context:\n{}" if ctxt else "")
 
+        no_pairs = True
         for i, (obj1, obj2) in enumerate(pairwise(iterable)):
-            msg = f"{desc}. Context: {ctxt if static else '{}'}"
-            if mode == "eq":
-                assert obj1 == obj2, msg if static else msg.format(ctxt(i))  # type: ignore[operator]
+            msg = msg_.format(ctxt(i)) if ctxt else msg_
+            if mode == "==":
+                assert obj1 == obj2, msg
             elif mode == "is":
-                assert obj1 is obj2, msg if static else msg.format(ctxt(i))  # type: ignore[operator]
+                assert obj1 is obj2, msg
             else:
-                msg = f"Invalid mode '{mode}' for '_assert_iter_consistency'"
+                msg = f"Invalid mode '{mode}' for '_assert_consistency'"
                 raise ValueError(msg)
+            no_pairs = False
 
+        assert not no_pairs, "Provide at least 2-long iterable"
         return obj2
 
-    OP = Literal["get", "set", "delete"]
+    opattr = Literal["get", "set", "delete"]
 
     def _assert_same_behaviour(
         *objs: object,
         attr: str,
-        ops: OP | tuple[OP, ...],
+        ops: opattr | tuple[opattr, ...],
     ) -> None:
-        if len(objs) <= 1:
-            msg = "At least 2 objects required"
-            raise ValueError(msg)
-
-        # Objects should all be classes or all objects
-        are_classes = _assert_iter_consistency(
+        # Objects should all be classes or all non-class
+        are_classes = _assert_consistency(
             map(inspect.isclass, objs),
-            mode="eq",
-            desc="Inconsistent 'isclass' flags",
-            ctxt=lambda i: f"{objs[i]}, {objs[i+1]}",
+            mode="==",
+            desc="'isclass' flags",
+            ctxt=lambda i: f"objects: {objs[i]}, {objs[i + 1]}",
         )
 
         if isinstance(ops, str):
@@ -404,31 +403,27 @@ def assert_same_behaviour() -> Callable:
         # Loop through ops
         for i, collected_op in enumerate(zip(*collected, strict=False)):
             names, exception_flags, blueprints = zip(*collected_op, strict=False)
-            ctxt = lambda j: f"attr='{attr}' | classes: {names[j]}, {names[j+1]}"  # noqa: B023, E731
-            ops_str = f"'{' > '.join(ops[:i+1])}'"
-            # All exceptions or none
-            are_exceptions = _assert_iter_consistency(
+            ctxt = lambda j: "\n".join([  # noqa: E731
+                f"attr: '{attr}'",
+                f"classes: '{names[j]}', '{names[j + 1]}'",  # noqa: B023
+                f"blueprints: '{blueprints[j]}', '{blueprints[j + 1]}'",  # noqa: B023
+            ])
+            ops_str = f"'{' > '.join(ops[: i + 1])}'"
+
+            # All exceptions or all outputs
+            are_exceptions = _assert_consistency(
                 exception_flags,
-                mode="eq",
-                desc=f"Inconsistent 'is_exception' flags after {ops_str}",
+                mode="==",
+                desc=f"'is_exception' flags after {ops_str}",
                 ctxt=ctxt,
             )
 
-            if are_exceptions:
-                # Check exception is the same
-                _ = _assert_iter_consistency(
-                    blueprints,
-                    mode="eq",
-                    desc=f"Inconsistent exceptions after {ops_str}",
-                    ctxt=ctxt,
-                )
-            else:
-                # Check result is the same
-                _ = _assert_iter_consistency(
-                    blueprints,  # outputs
-                    mode="is",
-                    desc=f"Inconsistent outputs after {ops_str}",
-                    ctxt=ctxt,
-                )
+            # Check exceptions or outputs are consistent
+            _ = _assert_consistency(
+                blueprints,
+                mode="==" if are_exceptions else "is",
+                desc=f"{'exceptions' if are_exceptions else 'outputs'} after {ops_str}",
+                ctxt=ctxt,
+            )
 
     return _assert_same_behaviour
