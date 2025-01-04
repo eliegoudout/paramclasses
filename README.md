@@ -303,6 +303,8 @@ This should not be a very common use case anyway.
 
 ### Multiple inheritance
 
+###### With paramclass bases
+
 Multiple inheritance is not a problem. Default values will be retrieved as expect following the MRO, but there's one caveat: protected attributes should be consistant between the bases. For example, if `A.x` is not protected while `B.x` is, one cannot take `(A, B)` for bases.
 ```python
 class A(ParamClass):
@@ -323,6 +325,21 @@ class D(A, B): ...  # Should FAIL
 <traceback>
 paramclasses.paramclasses.ProtectedError: Incoherent protection inheritance for attribute 'x'
 ```
+
+###### Inheriting from non-paramclasses
+
+It is possible to inherit from a mix of paramclasses and non-paramclasses, with the two following limitations.
+
+1. This metaclasses inheritance scheme must be respected:
+```python
+type(ParamClass) -> ABCMeta -> type
+```
+As such, bases must be ordered like below.
+```python
+(*paramclasses, *abstractclasses, *vanillaclasses)
+```
+
+2. Behaviour is not guaranteed for non-paramclass bases with attributes corresponding to either `DEFAULT` or `PROTECTED` values -- _see [Subclassing API](#3-subclassing-api-)_.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
