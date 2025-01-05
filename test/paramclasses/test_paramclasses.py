@@ -20,7 +20,7 @@ def test_slot_compatible(null):
     assert "x" not in vars(a)
 
 
-@pytest.mark.skip(reason="Don't want to monkeypatch, treat #4 before")
+# @pytest.mark.skip(reason="Don't want to monkeypatch, treat #4 before")
 def test_repr_with_missing_and_recursion(ParamTest):
     """Show non-default and missing in `repr`, handle recursive."""
 
@@ -33,7 +33,7 @@ def test_repr_with_missing_and_recursion(ParamTest):
 
     expected = (
         "ReprTest("
-        "a_unprotected_parameter_with_nodefaultvalue=?, "
+        "a_unprotected_parameter_with_missing=?, "
         "a_unprotected_parameter_slot=<member 'a_unprotected_parameter_slot' of"
         " 'ParamTest' objects>, "
         "a_recursive_parameter=...)"
@@ -48,23 +48,9 @@ def test_missing_params(ParamTest, paramtest_attrs):
     assert expected == paramtest_missing
 
 
-def test_repr_replace_above_while_issue_4() -> None:
-    """String representation, with missing value and recursion."""
-
-    class A(ParamClass):
-        a = 0
-        b: int = 1
-        c: int
-        d: type
-
-    x = A(b=2)
-    x.c = x
-    assert repr(x) == "A(b=2, c=..., d=?)"
-
-
 def test_cannot_define_double_dunder_parameter():
-    """Double dunder parameters are forbidden."""
-    regex = r"^Double dunder parameters \('__'\) are forbidden$"
+    """Dunder parameters are forbidden."""
+    regex = r"^Dunder parameters \('__'\) are forbidden$"
     with pytest.raises(AttributeError, match=regex):
 
         class A(ParamClass):

@@ -11,7 +11,6 @@ __all__ = [
 ]
 
 from abc import ABCMeta
-from collections.abc import Collection
 from dataclasses import dataclass
 from itertools import chain
 from reprlib import recursive_repr
@@ -86,17 +85,18 @@ class _MetaFrozen(type):
         raise ProtectedError(msg)
 
 
-def _assert_unprotected(attr: str, protected: Collection) -> None:
+def _assert_unprotected(attr: str, protected: dict[str, type | None]) -> None:
     """Assert that `attr not in protected`."""
     if attr in protected:
-        msg = f"Attribute '{attr}' is protected"
+        owner = protected[attr]
+        msg = f"'{attr}' is protected by {_repr_owner(owner)}"
         raise ProtectedError(msg)
 
 
 def _assert_valid_param(attr: str) -> None:
     """Assert that `attr` is authorized as parameter name."""
     if attr.startswith("__") and attr.endswith("__"):
-        msg = f"Double dunder parameters ('{attr}') are forbidden"
+        msg = f"Dunder parameters ('{attr}') are forbidden"
         raise AttributeError(msg)
 
 
@@ -105,6 +105,17 @@ def _dont_assign_missing(attr: str, val: object) -> None:
     if val is MISSING:
         msg = f"Assigning special missing value (attribute '{attr}') is forbidden"
         raise ValueError(msg)
+
+
+def _repr_owner(*bases: type | None) -> str:
+    """Repr of bases for protection conflic error message."""
+
+    def _mono_repr(cls: type | None) -> str:
+        if cls is None:
+            return "<paramclasses root protection>"
+        return f"'{cls.__name__}'"
+
+    return ", ".join(sorted(map(_mono_repr, bases)))
 
 
 @final
@@ -116,7 +127,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     be compatible with its functionality.
     """
 
-    def __new__(mcs, name: str, bases: tuple, namespace: dict[str, object]) -> type:  # noqa: N804
+    def __new__(mcs, name: str, bases: tuple, namespace: dict[str, object]) -> type:  # noqa: C901, N804
         """Most of `_MetaParamClass` logic.
 
         It essentially does the following.
@@ -124,31 +135,33 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
             2. Inspects `namespace` and its `__annotations__` to infer
                 new parameters and newly protected attributes.
         """
-        protected_special = [DEFAULT, PROTECTED, "__dict__"]
         # # Bases: default, protected
         default: dict = {}
-        protected_dict_bases: dict = {}
+        protected_special = [DEFAULT, PROTECTED, "__dict__"]
+        protected: dict = {attr: None for attr in protected_special}
         for base in bases[::-1]:
             default |= getattr(base, DEFAULT, {})
             # Previous bases protected coherence
-            for attr, val_protected in protected_dict_bases.items():
-                val = getattr(base, attr, MISSING)
-                if val is not val_protected and val is not MISSING:
-                    msg = f"Incoherent protection inheritance for attribute '{attr}'"
-                    raise ProtectedError(msg)
-            for attr in getattr(base, PROTECTED, []):
-                if attr in protected_dict_bases or attr in protected_special:
+            protected_base = getattr(base, PROTECTED, {})
+            for attr in vars(base):
+                if attr in protected_special:
                     continue
-                protected_dict_bases[attr] = getattr(base, attr)
+                if attr in protected:
+                    owner = protected[attr]
+                    msg = f"'{attr}' protection conflict: {_repr_owner(base, owner)}"
+                    raise ProtectedError(msg)
+                if attr in protected_base:
+                    protected[attr] = base
 
         # # Namespace: handle slots, protect, store parameters
-        protected = set(chain(protected_dict_bases, protected_special))
-
         # Cannot slot protected
         slots = cast(tuple, namespace.get("__slots__", ()))
-        protected_then_slotted = protected & set(slots)
-        if protected_then_slotted:
-            msg = f"Cannot slot already protected attributes: {protected_then_slotted}"
+        protect_then_slot = set(protected).intersection(slots)
+        if protect_then_slot:
+            msg = "Cannot slot the following protected attributes: " + ", ".join(
+                f"'{attr}' (from {_repr_owner(protected[attr])})"
+                for attr in sorted(protect_then_slot)  # sort for pytest output
+            )
             raise ProtectedError(msg)
 
         # Unwrap decorator and identify new protected
@@ -171,9 +184,15 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
         # Update namespace
         namespace_final[DEFAULT] = MappingProxyType(default)
-        namespace_final[PROTECTED] = frozenset(chain(protected, protected_new))
+        namespace_final[PROTECTED] = MappingProxyType(protected)
 
-        return super().__new__(mcs, name, bases, namespace_final)
+        cls = super().__new__(mcs, name, bases, namespace_final)
+
+        # Declare `cls` as owner for newly protected attributes
+        for attr in protected_new:
+            protected[attr] = cls
+
+        return cls
 
     def __getattribute__(cls, attr: str) -> object:
         """Handle descriptor parameters."""
