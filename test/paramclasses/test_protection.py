@@ -40,7 +40,7 @@ def test_multiple_protection():
 
 def test_simple_protection_inheritance():
     """Subclass cannot override protected."""
-    regex = "^Attribute 'params' is protected$"
+    regex = "^'params' is protected by 'ParamClass'$"
     with pytest.raises(ProtectedError, match=regex):
 
         class A(ParamClass):
@@ -56,29 +56,30 @@ def test_multiple_inheritance():
     class B(ParamClass):
         x = 0
 
-    class C(ParamClass):
-        x = 0.0
+    class C:
+        x = 0
 
-    # Coherent protection order
-    class D(A, B): ...
+    for Other in (B, C):
+        # Coherent protection order: OK
+        class C(A, Other): ...
 
-    # Incoherent order but same value so compatible
-    class E(B, A): ...
+        # Incoherent protection order
+        regex = f"^'x' protection conflict: 'A', '{Other.__name__}'$"
+        with pytest.raises(ProtectedError, match=regex):
 
-    # Previously protected and incompatible value
-    regex = "^Incoherent protection inheritance for attribute 'x'$"
-    with pytest.raises(ProtectedError, match=regex):
-
-        class F(C, A): ...
+            class D(Other, A): ...
 
 
 def test_cannot_slot_previously_protected():
     """Cannot slot previously protected attribute."""
-    regex = "^Cannot slot already protected attributes: {'params'}$"
+    regex = (
+        r"^Cannot slot the following protected attributes: '__paramclass_protected_' "
+        r"\(from <paramclasses root protection>\), 'params' \(from 'ParamClass'\)$"
+    )
     with pytest.raises(ProtectedError, match=regex):
 
         class A(ParamClass):
-            __slots__ = ("params",)
+            __slots__ = ("__paramclass_protected_", "params")
 
 
 def test_post_creation_protection():
@@ -107,7 +108,7 @@ def test_dict_is_protected():
 
 def test_cannot_turn_previously_protected_into_param():
     """Cannot make non-param protected into parameter."""
-    regex = "^Attribute 'params' is protected$"
+    regex = "^'params' is protected by 'ParamClass'$"
     with pytest.raises(ProtectedError, match=regex):
 
         class A(ParamClass):

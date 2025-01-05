@@ -48,7 +48,7 @@ def test_behaviour_set_del_protected_class_and_instances(
     param = obj("Param")
     param_full = obj("Param", fill_dict=True)
     for attr in paramtest_attrs("protected"):
-        regex = f"^Attribute '{attr}' is protected$"
+        regex = f"^'{attr}' is protected by 'ParamTest'"
         assert_set_del_is_protected(param, attr, regex)
         assert_set_del_is_protected(param_full, attr, regex)
         assert_set_del_is_protected(ParamTest, attr, regex)

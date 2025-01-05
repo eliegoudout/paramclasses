@@ -376,14 +376,7 @@ paramclasses.paramclasses.ProtectedError: Incoherent protection inheritance for 
 
 It is possible to inherit from a mix of paramclasses and non-paramclasses, with the two following limitations.
 
-1. This metaclasses inheritance scheme must be respected:
-```python
-type(ParamClass) -> ABCMeta -> type
-```
-As such, bases must be ordered like below.
-```python
-(*paramclasses, *abstractclasses, *vanillaclasses)
-```
+1. Because `type(ParamClass)` is a subclass of `ABCMeta`, non-paramclass bases must be either vanilla classes or abstract class.
 
 2. Behaviour is not guaranteed for non-paramclass bases with attributes corresponding to either `DEFAULT` or `PROTECTED` values -- _see [Subclassing API](#3-subclassing-api-)_.
 
