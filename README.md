@@ -120,21 +120,22 @@ Parameters can be assigned values like any other attribute -- unless specificall
 ```python
 class A(ParamClass):
     x: ...      # Parameter without default value
-    y: ... = 1  # Parameter with default value `1`
-    z = 2       # Non-parameter attribute
+    y: ... = 0  # Parameter with default value `0`
+    z: ... = 0  # Parameter with default value `0`
+    t = 0       # Non-parameter attribute
 ```
 ```pycon
->>> A(y=0)                      # Instantiation assignments
-A(x=?, y=0)                     # Only shows non-default values
->>> A().set_params(x=0, y=0)    # `set_params` assignments
->>> A().y = 1                   # Usual assignment
->>> del A(x=0).x                # Usual deletion
->>> A.x = 1                     # Class-level assignment/deletion works...
+>>> a = A(y=1); a.t = 1; a    # Instantiation assignments
+A(x=?, y=1)                   # Only shows missing and non-default parameters
+>>> A().set_params(x=2, y=2)  # `set_params` assignments
+>>> A().y = 1                 # Usual assignment
+>>> del A(x=0).x              # Usual deletion
+>>> A.y = 1                   # Class-level assignment/deletion works...
 >>> A()
-A(x=1)                          # ... and `A` remembers default values -- otherwise would show `A(x=?)`
->>> a.set_params(z=0)           # Should FAIL: Non-parameters cannot be assigned with `set_params`
+A(x=?, y=1)                   # ... and `A` remembers default values -- otherwise would show `A(x=?)`
+>>> a.set_params(t=0)         # Should FAIL: Non-parameters cannot be assigned with `set_params`
 <traceback>
-AttributeError: Invalid parameters: {'z'}. Operation cancelled
+AttributeError: Invalid parameters: {'t'}. Operation cancelled
 ```
 
 ### Expected `getattr`, `setattr` and `delattr` behaviour
@@ -252,7 +253,7 @@ def __repr__(self) -> str:
 Furthermore, _as a last resort_, developers may occasionally wish to use the following module attributes.
 
 - `DEFAULT`: Current value is `"__paramclass_default_"`. Use `getattr(self, DEFAULT)` to access the dict (`mappingproxy`) of parameters' `(key, default value)` pairs.
-- `PROTECTED`: Current value is `"__paramclass_protected_"`. Use `getattr(self, PROTECTED)` to access the set (`frozenset`) of protected parameters.
+- `PROTECTED`: Current value is `"__paramclass_protected_"`. Use `getattr(self, PROTECTED)` to access the dict (`mappingproxy`) of `(protected attributes, owner)` pairs.
 - `MISSING`: The object representing the "missing value" in the default values of parameters. Using `instance.missing_params` should almost always be enough, but if necessary, use `val is MISSING` to check for missing values.
 
 Strings `DEFAULT` and `PROTECTED` act as special protected keys for _paramclasses_' namespaces, to leave `default` and `protected` available to users. We purposefully chose _would-be-mangled_ names to further decrease odds of natural conflict.
@@ -262,7 +263,7 @@ Strings `DEFAULT` and `PROTECTED` act as special protected keys for _paramclasse
 from paramclasses import ParamClass, DEFAULT, PROTECTED
 
 getattr(ParamClass, DEFAULT)    # mappingproxy({})
-getattr(ParamClass, PROTECTED)  # frozenset({'params', '__getattribute__', '__paramclass_default_', '__paramclass_protected_', 'missing_params', '__setattr__', '__init__', '__delattr__', 'set_params', '__dict__'})
+getattr(ParamClass, PROTECTED)  # mappingproxy({'__paramclass_default_': None, '__paramclass_protected_': None, '__dict__': None, 'set_params': <class 'paramclasses.paramclasses.ParamClass'>, 'params': <class 'paramclasses.paramclasses.ParamClass'>, 'missing_params': <class 'paramclasses.paramclasses.ParamClass'>, '__init__': <class 'paramclasses.paramclasses.ParamClass'>, '__getattribute__': <class 'paramclasses.paramclasses.ParamClass'>, '__setattr__': <class 'paramclasses.paramclasses.ParamClass'>, '__delattr__': <class 'paramclasses.paramclasses.ParamClass'>})
 # Works on subclasses and instances too
 ```
 
@@ -306,26 +307,26 @@ A(x=2)                  # Second protection did fail
 ```python
 import numpy as np
 
-class Aggregator(ParamClass):
-    aggregator: ... = np.cumsum
+class Operator(ParamClass):
+    op: ... = np.cumsum
 
-Aggregator().aggregator([0, 1, 2])  # array([0, 1, 3])
+Operator().op([0, 1, 2])  # array([0, 1, 3])
 ```
 
 This behaviour is similar to [dataclasses](https://docs.python.org/3/library/dataclasses.html)' **but is not trivial**:
 ```python
-class NonParamAggregator:
-    aggregator: ... = np.cumsum
+class NonParamOperator:
+    op: ... = np.cumsum
 ```
 ```pycon
->>> NonParamAggregator().aggregator([0, 1, 2])  # Should FAIL
+>>> NonParamOperator().op([0, 1, 2])  # Should FAIL
 <traceback>
 TypeError: 'list' object cannot be interpreted as an integer
->>> NonParamAggregator().aggregator
-<bound method cumsum of <__main__.NonParamAggregator object at 0x13a10e7a0>>
+>>> NonParamOperator().op
+<bound method cumsum of <__main__.NonParamOperator object at 0x13a10e7a0>>
 ```
 
-Note how `NonParamAggregator().aggregator` is a **bound** method. What happened here is that since `np.cumsum` is a data [descriptor](https://docs.python.org/3/howto/descriptor.html) -- like all `function`, `property` or `member_descriptor` objects for example --, the function `np.cumsum(a, axis=None, dtype=None, out=None)` interpreted `NonParamAggregator()` to be the array `a`, and `[0, 1, 2]` to be the `axis`.
+Note how `NonParamOperator().op` is a **bound** method. What happened here is that since `np.cumsum` is a data [descriptor](https://docs.python.org/3/howto/descriptor.html) -- like all `function`, `property` or `member_descriptor` objects for example --, the function `np.cumsum(a, axis=None, dtype=None, out=None)` interpreted `NonParamOperator()` to be the array `a`, and `[0, 1, 2]` to be the `axis`.
 
 To avoid this kind of surprises we chose, **for parameters only**, to bypass the get/set/delete descriptor-specific behaviours, and treat them as _usual_ attributes. Contrary to [dataclasses](https://docs.python.org/3/library/dataclasses.html), by also bypassing descriptors for set/delete operations, we allow property-valued parameters, for example.
 ```python
@@ -369,7 +370,7 @@ class D(A, B): ...  # Should FAIL
 >>> class D(A, B): ...  # Should FAIL
 ... 
 <traceback>
-paramclasses.paramclasses.ProtectedError: Incoherent protection inheritance for attribute 'x'
+ProtectedError: 'x' protection conflict: 'A', 'B'
 ```
 
 ###### Inheriting from non-paramclasses
