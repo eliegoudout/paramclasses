@@ -49,7 +49,7 @@ def test_modify_mappingproxy(monkeypatch):
     m = monkeypatch
 
     class Exploit:
-        def __eq__(self, other):
+        def __eq__(self, other: dict) -> None:  # type:ignore[override]
             m.delitem(other, "params")
 
     instance = ParamClass()
@@ -57,5 +57,5 @@ def test_modify_mappingproxy(monkeypatch):
 
     # Check "params" protection before unprotecting it
     assert "params" in protected
-    protected == Exploit()
+    protected == Exploit()  # noqa: B015
     assert "params" not in protected
