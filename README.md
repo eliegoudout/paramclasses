@@ -41,13 +41,25 @@ pip install paramclasses
 
 ## 1. Rationale 👩‍🏫
 
-###### Parameter-holding classes vs. inheritance...
+##### Parameter-holding classes vs. inheritance...
 
 For a _parameter_-holding class, like [dataclasses](https://docs.python.org/3/library/dataclasses.html), it would be nice to embark some inherited functionality -- _e.g._ `params` property to access current `(key, value)` pairs, `missing_params` for unassigned parameter keys,... Such inheritance would allow to factor out specialized functionality for context-dependant methods -- _e.g._ `fit`, `reset`, `plot`, etc... However, such subclassing comes with a risk of attributes conflicts, especially for libraries or exposed APIs, when users do not necessarily know every "read-only" (or "**protected**") attributes from base classes.
 
-###### Our solution 😌
+##### Our solution 😌
 
-To solve this problem, we propose a base `ParamClass` and an `@protected` decorator, which robustly protects any target attribute from being accidentally overriden when subclassing, at runtime. Note that `@dataclass(frozen=True)` only applies protection to instances' parameters and can silently override base class assignments. Atlernatives such as [`typing.final`](https://docs.python.org/3/library/typing.html#typing.final) and [`typing.Final`](https://docs.python.org/3/library/typing.html#typing.Final) are designed for type checkers on which we do not want to rely -- from python 3.11 onwards, `final` does add a `__final__` flag when possible, but it will not affect immutable objects.
+To solve this problem, we propose a base `ParamClass` and an `@protected` decorator, which robustly protects any target attribute -- not only parameters -- from being accidentally overriden when subclassing, at runtime. If a subclass tries to override an attribute protected by one of its parents, a detailed `ProtectedError` will be raised and class definition will fail.
+
+##### Why not use `@dataclass(frozen=True)` or `typing.final`?
+
+First of all, the `@dataclass(frozen=True)` decorator only applies protection to instances. Besides, it targets all attributes indifferently. Morover, it does not protect against deletion or direct `vars(instance)` manipulation. Finally, protection is not inherited, thus subclasses need to use the decorator again, while being cautious not to silently override previously protected attributes.
+
+The `typing` alternatives [`@final`](https://docs.python.org/3/library/typing.html#typing.final) and [`Final`](https://docs.python.org/3/library/typing.html#typing.Final) are designed for type checkers on which we do not want to rely. From python 3.11 onwards, `final` _does_ add a `__final__` flag when possible, but it will not affect immutable objects.
+
+We also mention this [recent PEP draft](https://peps.python.org/pep-0767/) considering attribute-level protection, again for type checkers and without considering subclassing protection.
+
+##### Disclaimer
+
+Note that the protection provided by _paramclasses_ is very robust for **practical use**, but it **should not** be considered a security feature.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
@@ -56,7 +68,7 @@ To solve this problem, we propose a base `ParamClass` and an `@protected` decora
 
 ### Defining a _paramclass_
 
-A _paramclass_ is defined by subclassing `ParamClass` directly or another _paramclass_. Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), **parameters** are identified as **any annotated attribute** and instancation logic is automatically built-in -- though it can be [extended](#instantiation-logic-with-__post_init__).
+A _paramclass_ is simply defined by subclassing `ParamClass` directly or another _paramclass_. Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), **parameters** are identified as **any annotated attribute** and instancation logic is automatically built-in -- though it can be [extended](#instantiation-logic-with-__post_init__).
 ```python
 from paramclasses import ParamClass
 
@@ -396,11 +408,11 @@ Before using `__slots__` with `ParamClass`, please note the following.
 
 ### Breaking `ParamClass` protection scheme
 
-There is no such thing as "perfect attribute protection" in Python. As such `ParamClass` only provides protection against natural behaviour (and even unnatural to a large extent). Below are some [knonwn](test/paramclasses/test_breaking_protection.py) easy ways to break it, representing **discouraged behaviour**. If you find other elementary ways, please report them in an [issue](https://github.com/eliegoudout/paramclasses/issues).
+There is no such thing as "perfect attribute protection" in Python. As such `ParamClass` only provides protection against natural behaviour -- and even unnatural to a _large_ extent. Below are some [knonwn](test/paramclasses/test_breaking_protection.py) easy ways to break it, representing **discouraged behaviour**. If you find other elementary ways, please report them in an [issue](https://github.com/eliegoudout/paramclasses/issues).
 
 1. Modifying `@protected` -- _huh?_
 2. Modifying or subclassing `type(ParamClass)` -- requires evil dedication.
-3. Mess with `mappingproxy`, which is [not really](https://bugs.python.org/msg391039) immutable.
+3. Messing with `mappingproxy`, which is [not really](https://bugs.python.org/msg391039) immutable.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
