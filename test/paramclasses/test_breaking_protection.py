@@ -35,6 +35,8 @@ def test_break_protection_modifying_mcs(monkeypatch):
 
     m.setattr(type(type(ParamClass)), "__setattr__", type.__setattr__)
     m.setattr(type(ParamClass), "__setattr__", type.__setattr__)
+    # Also `__delattr__` because it is called by `monkeypatch` to undo.
+    m.setattr(type(ParamClass), "__delattr__", type.__delattr__)
     m.setattr(ParamClass, "__setattr__", object.__setattr__)
 
     # Try overriding a protected attribute

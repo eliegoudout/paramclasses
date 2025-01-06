@@ -17,6 +17,7 @@ __all__ = [
     "PROTECTED",
     "ParamClass",
     "ProtectedError",
+    "RawParamClass",
     "isparamclass",
     "protected",
 ]
@@ -27,6 +28,7 @@ from .paramclasses import (
     PROTECTED,
     ParamClass,
     ProtectedError,
+    RawParamClass,
     isparamclass,
     protected,
 )
