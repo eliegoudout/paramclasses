@@ -107,7 +107,7 @@ Then, we are [guaranteed](#breaking-paramclass-protection-scheme) that no subcla
 ...     fit = True  # This should FAIL
 ... 
 <traceback>
-paramclasses.paramclasses.ProtectedError: Attribute 'fit' is protected
+ProtectedError: 'fit' is protected by 'BaseEstimator'
 ```
 
 This **runtime** protection can be applied to all methods, properties, attributes -- with `protected(value)` --, etc... during class definition but [not after](#post-creation-protection). It is "robust" in the sense that breaking the designed behaviour, though possible, requires -- to our knowledge -- [obscure patterns](#breaking-paramclass-protection-scheme).
@@ -395,10 +395,11 @@ Before using `__slots__` with `ParamClass`, please note the following.
 
 ### Breaking `ParamClass` protection scheme
 
-There is no such thing as "perfect attribute protection" in Python. As such `ParamClass` only provides protection against natural behaviour (and even unnatural to a large extent). Below are some [knonwn](test/test_breaking_protection.py) easy ways to break it, representing **discouraged behaviour**. If you find other elementary ways, please report them in an [issue](https://github.com/eliegoudout/paramclasses/issues).
+There is no such thing as "perfect attribute protection" in Python. As such `ParamClass` only provides protection against natural behaviour (and even unnatural to a large extent). Below are some [knonwn](test/paramclasses/test_breaking_protection.py) easy ways to break it, representing **discouraged behaviour**. If you find other elementary ways, please report them in an [issue](https://github.com/eliegoudout/paramclasses/issues).
 
 1. Modifying `@protected` -- _huh?_
 2. Modifying or subclassing `type(ParamClass)` -- requires evil dedication.
+3. Mess with `mappingproxy`, which is [not really](https://bugs.python.org/msg391039) immutable.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 

@@ -39,3 +39,23 @@ def test_break_protection_modifying_mcs(monkeypatch):
 
     # Try overriding a protected attribute
     m.setattr(ParamClass(), PROTECTED, "broken!")
+
+
+def test_modify_mappingproxy(monkeypatch):
+    """Modify mappingproxy using `__eq__` delegation to orig dict.
+
+    From https://bugs.python.org/msg391039
+    """
+    m = monkeypatch
+
+    class Exploit:
+        def __eq__(self, other):
+            m.delitem(other, "params")
+
+    instance = ParamClass()
+    protected = getattr(instance, PROTECTED)
+
+    # Check "params" protection before unprotecting it
+    assert "params" in protected
+    protected == Exploit()
+    assert "params" not in protected
