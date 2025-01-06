@@ -59,6 +59,7 @@ def _unprotect(val: object) -> tuple[object, bool]:
 
 class ProtectedError(AttributeError):
     """Don't assign or delete protected attributes."""
+    __module__ = "builtins"
 
 
 @final
