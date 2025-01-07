@@ -118,8 +118,9 @@ def test_behaviour_get_protected_nonparameter_class_and_instance(
     vanilla = obj("Vanilla")
     for attr in chain(paramtest_attrs("protected", "nonparameter")):
         assert_same_behaviour(ParamTest, VanillaTest, attr=attr, ops="get")
+        assert attr in vars(param_fill)
         assert_same_behaviour(param, param_fill, vanilla, attr=attr, ops="get")
-        assert attr not in vars(param_fill)
+        assert attr not in vars(param_fill)  # attr removed from `vars(param_fill)`
 
 
 def test_behaviour_get_special_case_instance_filled_attr_dict(null, obj):
@@ -164,8 +165,9 @@ def test_behaviour_get_parameter(
         assert getattr(ParamTest, attr) is unprotect(expected)
         assert getattr(param, attr) is unprotect(expected)
         if attr in protected_attrs:
+            assert attr in vars(param_fill)
             assert getattr(param_fill, attr) is unprotect(expected)
-            assert attr not in vars(param_fill)  # Value removed from dict
+            assert attr not in vars(param_fill)  # attr removed from `vars(param_fill)`
         else:
             assert getattr(param_fill, attr) is None  # The filled value
 
