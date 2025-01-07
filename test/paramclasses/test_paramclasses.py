@@ -83,12 +83,15 @@ def test_cannot_assign_special_missing_value(ParamTest, paramtest_attrs):
             setattr(ParamTest(), attr, MISSING)
 
 
-def test_set_params_works(ParamTest, paramtest_attrs, null):
+def test_init_and_set_params_works(ParamTest, paramtest_attrs, null):
     """For parameters, `set_params` works fine."""
-    instance = ParamTest()
     param_values = {attr: null for attr in paramtest_attrs("unprotected", "parameter")}
-    instance.set_params(**param_values)
-    assert all(getattr(instance, attr) is null for attr in param_values)
+    instance_init = ParamTest(**param_values)
+    instance_set_params = ParamTest()
+    instance_set_params.set_params(**param_values)
+
+    for instance in [instance_init, instance_set_params]:
+        assert all(getattr(instance, attr) is null for attr in param_values)
 
 
 def test_params(ParamTest, paramtest_attrs, null):
@@ -114,22 +117,25 @@ def test_params(ParamTest, paramtest_attrs, null):
     assert all(observed[attr] is expected[attr] for attr in observed)
 
 
-def test_set_params_wrong_attr_ignored(ParamTest, paramtest_attrs):
+def test_init_and_set_params_wrong_attr_ignored(ParamTest, paramtest_attrs, null):
     """Using `set_params` on non-parameters fails."""
-    instance = ParamTest()
-    param_values = {attr: 0 for attr in paramtest_attrs()}
+    param_values = {attr: null for attr in paramtest_attrs()}
 
     regex = "^Invalid parameters: {(.*?)}. Operation cancelled$"
     # Check error and match regex
-    with pytest.raises(AttributeError, match=regex) as excinfo:
-        instance.set_params(**param_values)
+    with pytest.raises(AttributeError, match=regex) as exc_init:
+        ParamTest(**param_values)
+
+    with pytest.raises(AttributeError, match=regex) as exc_set_params:
+        ParamTest().set_params(**param_values)
 
     # Check list of non parameters
     expected = sorted(paramtest_attrs("nonparameter"))
-    nonparams_str = re.match(regex, str(excinfo.value)).group(1)
-    observed = sorted(attr_repr[1:-1] for attr_repr in nonparams_str.split(", "))
+    for excinfo in [exc_init, exc_set_params]:
+        nonparams_str = re.match(regex, str(excinfo.value)).group(1)
+        observed = sorted(attr_repr[1:-1] for attr_repr in nonparams_str.split(", "))
 
-    assert expected == observed
+        assert expected == observed
 
 
 def test_isparamclass_works_even_against_virtual(ParamTest):

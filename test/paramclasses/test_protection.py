@@ -47,7 +47,7 @@ def test_simple_protection_inheritance():
             params = 0
 
 
-def test_multiple_inheritance():
+def test_multiple_inheritance_consistent_protection():
     """Check protection compatibility for multiple inheritance."""
 
     class A(ParamClass):
@@ -61,13 +61,44 @@ def test_multiple_inheritance():
 
     for Other in (B, C):
         # Coherent protection order: OK
-        class C(A, Other): ...
+        class D(A, Other): ...
 
         # Incoherent protection order
         regex = f"^'x' protection conflict: 'A', '{Other.__name__}'$"
         with pytest.raises(ProtectedError, match=regex):
 
             class D(Other, A): ...
+
+
+def test_multiple_inheritance_protection_conflict():
+    """Cannot have two different attribute owners."""
+
+    class A(ParamClass):
+        x = protected(0)
+
+    class B(ParamClass):
+        x = protected(0)
+
+    regex = "^'x' protection conflict: 'A', 'B'$"
+    with pytest.raises(ProtectedError, match=regex):
+
+        class C(A, B): ...
+
+
+def test_multiple_inheritance_diamond_is_fine():
+    """Test common parent class in multiple inheritance."""
+
+    class A(ParamClass):
+        x = protected(0)
+
+    class B(A): ...
+
+    class C(A): ...
+
+    # Diamond inheritance: OK
+    class D(C, B): ...
+
+    assert getattr(D, PROTECTED)["x"] is A
 
 
 def test_cannot_slot_previously_protected():

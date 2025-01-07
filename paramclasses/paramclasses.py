@@ -6,6 +6,7 @@ __all__ = [
     "PROTECTED",
     "ParamClass",
     "ProtectedError",
+    "RawParamClass",
     "isparamclass",
     "protected",
 ]
@@ -120,16 +121,30 @@ def _repr_owner(*bases: type | None) -> str:
     return ", ".join(sorted(map(_mono_repr, bases)))
 
 
+def _update_while_checking_consistency(orig: dict, update: dict) -> None:
+    """Update `orig` with `update`, verifying consistent shared keys.
+
+    Use only for protection checking.
+    """
+    for attr, val in update.items():
+        if attr not in orig:
+            orig[attr] = val
+            continue
+        if (previous := orig[attr]) is not val:
+            msg = f"'{attr}' protection conflict: {_repr_owner(val, previous)}"
+            raise ProtectedError(msg)
+
+
 @final
 class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
-    """Specifically implemented as ParamClass metaclass.
+    """Specifically implemented as `RawParamClass`'s metaclass.
 
     Implements class-level protection behaviour and parameters
     identification, with default values. Also subclasses `ABCMeta` to
     be compatible with its functionality.
     """
 
-    def __new__(mcs, name: str, bases: tuple, namespace: dict[str, object]) -> type:  # noqa: C901, N804
+    def __new__(mcs, name: str, bases: tuple, namespace: dict[str, object]) -> type:  # noqa: N804
         """Most of `_MetaParamClass` logic.
 
         It essentially does the following.
@@ -144,16 +159,13 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         for base in bases[::-1]:
             default |= getattr(base, DEFAULT, {})
             # Previous bases protected coherence
-            protected_base = getattr(base, PROTECTED, {})
+            _update_while_checking_consistency(protected, getattr(base, PROTECTED, {}))
             for attr in vars(base):
                 if attr in protected_special:
                     continue
-                if attr in protected:
-                    owner = protected[attr]
+                if attr in protected and (owner := protected[attr]) is not base:
                     msg = f"'{attr}' protection conflict: {_repr_owner(base, owner)}"
                     raise ProtectedError(msg)
-                if attr in protected_base:
-                    protected[attr] = base
 
         # # Namespace: handle slots, protect, store parameters
         # Cannot slot protected
@@ -235,45 +247,8 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         return super().__delattr__(attr)
 
 
-class ParamClass(metaclass=_MetaParamClass):
-    """Parameter-holding class with robust subclassing protection.
-
-    This is the base "paramclass". To define a "paramclass", simply
-    subclass `ParamClass` or any of its subclasses, inheriting from its
-    functionalities. When defining a "paramclass", use the `@protected`
-    decorator to disable further setting and deleting on target
-    attributes. The protection affects both the defined class and its
-    future subclasses, as well as any of their instances. Also,
-    `ParamClass` inherits from `ABC` functionalities
-
-    A "parameter" is any attribute that was given an annotation during
-    class definition, similar to `@dataclass`. For "parameters",
-    get/set/delete interactions bypass descriptors mechanisms. For
-    example, if `A.x` is a descriptor, `A().x is A.x`. This is similar
-    to the behaviour of dataclasses and is extended to set/delete.
-
-    Subclasses may wish to implement a callback on parameter-value
-    modification with `_on_param_will_be_set()`, or to further customize
-    instanciation (which is similar to keywords-only dataclasses') with
-    `__post_init__()`.
-
-    Unprotected methods:
-        _on_param_will_be_set: Call before parameter assignment.
-        __post_init__: Init logic, after parameters assignment.
-        __repr__: Show all non-default or missing, e.g. `A(x=1, y=?)`.
-
-    Protected methods:
-        set_params: Set multiple parameter values at once via keywords.
-        __init__: Set parameters and call `__post_init__`.
-        __getattribute__: Handle descriptor parameters.
-        __setattr__: Handle protection, missing value, descriptor
-            parameters.
-        __delattr__: Handle protection, descriptor parameters.
-
-    Protected properties:
-        params (dict[str, object]): Current parameter dict for instance.
-        missing_params (tuple[str]): Parameters without value.
-    """
+class RawParamClass(metaclass=_MetaParamClass):
+    """`ParamClass` without `set_params`, `params`, `missing_params`."""
 
     # ========================= Subclasses may override these ==========================
     #
@@ -295,33 +270,6 @@ class ParamClass(metaclass=_MetaParamClass):
 
     # ==================================================================================
 
-    @protected
-    def set_params(self, **param_values: object) -> None:
-        """Set multiple parameter values at once via keywords."""
-        wrong = set(param_values) - set(getattr(self, DEFAULT))
-        if wrong:
-            msg = f"Invalid parameters: {wrong}. Operation cancelled"
-            raise AttributeError(msg)
-
-        for attr, val in param_values.items():
-            setattr(self, attr, val)
-
-    @protected  # type: ignore[prop-decorator]  # mypy is fooled
-    @property
-    def params(self) -> dict[str, object]:
-        """Current parameter dict for instance."""
-        return {attr: getattr(self, attr, MISSING) for attr in getattr(self, DEFAULT)}
-
-    @protected  # type: ignore[prop-decorator]  # mypy is fooled
-    @property
-    def missing_params(self) -> tuple[str]:
-        """Parameters without value."""
-        return tuple(
-            attr
-            for attr in getattr(self, DEFAULT)
-            if not hasattr(self, attr) or getattr(self, attr) is MISSING
-        )
-
     @protected  # type: ignore[misc]  # mypy is fooled
     def __init__(
         self,
@@ -341,7 +289,16 @@ class ParamClass(metaclass=_MetaParamClass):
                 instantiation.
 
         """
-        self.set_params(**param_values)  # type: ignore[operator]  # mypy is fooled
+        # Set params: KEEP UP-TO-DATE with `ParamClass.set_params`!
+        wrong = set(param_values) - set(getattr(self, DEFAULT))
+        if wrong:
+            msg = f"Invalid parameters: {wrong}. Operation cancelled"
+            raise AttributeError(msg)
+
+        for attr, val in param_values.items():
+            setattr(self, attr, val)
+
+        # Call `__post_init__`
         if args is None:
             args = []
         if kwargs is None:
@@ -420,11 +377,84 @@ class ParamClass(metaclass=_MetaParamClass):
             super().__delattr__(attr)
 
 
-def isparamclass(cls: type) -> bool:
-    """Check if `cls` is a paramclass."""
+class ParamClass(RawParamClass):
+    """Parameter-holding class with robust subclassing protection.
+
+    This is the base "paramclass". To define a "paramclass", simply
+    subclass `ParamClass` or any of its subclasses, inheriting from its
+    functionalities. When defining a "paramclass", use the `@protected`
+    decorator to disable further setting and deleting on target
+    attributes. The protection affects both the defined class and its
+    future subclasses, as well as any of their instances. Also,
+    `ParamClass` inherits from `ABC` functionalities
+
+    A "parameter" is any attribute that was given an annotation during
+    class definition, similar to `@dataclass`. For "parameters",
+    get/set/delete interactions bypass descriptors mechanisms. For
+    example, if `A.x` is a descriptor, `A().x is A.x`. This is similar
+    to the behaviour of dataclasses and is extended to set/delete.
+
+    Subclasses may wish to implement a callback on parameter-value
+    modification with `_on_param_will_be_set()`, or to further customize
+    instanciation (which is similar to keywords-only dataclasses') with
+    `__post_init__()`.
+
+    Unprotected methods:
+        _on_param_will_be_set: Call before parameter assignment.
+        __post_init__: Init logic, after parameters assignment.
+        __repr__: Show all non-default or missing, e.g. `A(x=1, y=?)`.
+
+    Protected methods:
+        set_params: Set multiple parameter values at once via keywords.
+        __init__: Set parameters and call `__post_init__`.
+        __getattribute__: Handle descriptor parameters.
+        __setattr__: Handle protection, missing value, descriptor
+            parameters.
+        __delattr__: Handle protection, descriptor parameters.
+
+    Protected properties:
+        params (dict[str, object]): Current parameter dict for instance.
+        missing_params (tuple[str]): Parameters without value.
+    """
+
+    @protected
+    # KEEP UP-TO-DATE with first part of `RawParamClass.__init__`!
+    def set_params(self, **param_values: object) -> None:
+        """Set multiple parameter values at once via keywords."""
+        wrong = set(param_values) - set(getattr(self, DEFAULT))
+        if wrong:
+            msg = f"Invalid parameters: {wrong}. Operation cancelled"
+            raise AttributeError(msg)
+
+        for attr, val in param_values.items():
+            setattr(self, attr, val)
+
+    @protected  # type: ignore[prop-decorator]  # mypy is fooled
+    @property
+    def params(self) -> dict[str, object]:
+        """Current parameter dict for instance."""
+        return {attr: getattr(self, attr, MISSING) for attr in getattr(self, DEFAULT)}
+
+    @protected  # type: ignore[prop-decorator]  # mypy is fooled
+    @property
+    def missing_params(self) -> tuple[str]:
+        """Parameters without value."""
+        return tuple(
+            attr
+            for attr in getattr(self, DEFAULT)
+            if not hasattr(self, attr) or getattr(self, attr) is MISSING
+        )
+
+
+def isparamclass(cls: type, *, raw: bool = False) -> bool:
+    """Check if `cls` is a (raw)paramclass.
+
+    If `raw`, subclassing `RawParamClass` is enough to return `True`.
+    """
     # Should have same metaclass
-    if type(cls) is not type(ParamClass):
+    if type(cls) is not type(RawParamClass):
         return False
 
-    # Should inherit from `ParamClass`
-    return any(Parent is ParamClass for Parent in cls.__mro__)
+    # Should inherit from `(Raw)ParamClass`
+    param_class = RawParamClass if raw else ParamClass
+    return any(base is param_class for base in cls.__mro__)

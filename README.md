@@ -268,23 +268,24 @@ Furthermore, _as a last resort_, developers may occasionally wish to use the fol
 - `PROTECTED`: Current value is `"__paramclass_protected_"`. Use `getattr(self, PROTECTED)` to access the dict (`mappingproxy`) of `(protected attributes, owner)` pairs.
 - `MISSING`: The object representing the "missing value" in the default values of parameters. Using `instance.missing_params` should almost always be enough, but if necessary, use `val is MISSING` to check for missing values.
 
-Strings `DEFAULT` and `PROTECTED` act as special protected keys for _paramclasses_' namespaces, to leave `default` and `protected` available to users. We purposefully chose _would-be-mangled_ names to further decrease odds of natural conflict.
+Strings `DEFAULT` and `PROTECTED` act as special protected keys for _paramclasses_' namespaces, to leave `default` and `protected` available to users. We purposefully chose _would-be-mangled_ names to further decrease the odds of natural conflict.
 
 ```python
 # Recommended way of using `DEFAULT` and `PROTECTED`
 from paramclasses import ParamClass, DEFAULT, PROTECTED
 
 getattr(ParamClass, DEFAULT)    # mappingproxy({})
-getattr(ParamClass, PROTECTED)  # mappingproxy({'__paramclass_default_': None, '__paramclass_protected_': None, '__dict__': None, 'set_params': <class 'paramclasses.paramclasses.ParamClass'>, 'params': <class 'paramclasses.paramclasses.ParamClass'>, 'missing_params': <class 'paramclasses.paramclasses.ParamClass'>, '__init__': <class 'paramclasses.paramclasses.ParamClass'>, '__getattribute__': <class 'paramclasses.paramclasses.ParamClass'>, '__setattr__': <class 'paramclasses.paramclasses.ParamClass'>, '__delattr__': <class 'paramclasses.paramclasses.ParamClass'>})
+getattr(ParamClass, PROTECTED)  # mappingproxy({'__paramclass_default_': None, '__paramclass_protected_': None, '__dict__': None, '__init__': <class 'paramclasses.paramclasses.RawParamClass'>, '__getattribute__': <class 'paramclasses.paramclasses.RawParamClass'>, '__setattr__': <class 'paramclasses.paramclasses.RawParamClass'>, '__delattr__': <class 'paramclasses.paramclasses.RawParamClass'>, 'set_params': <class 'paramclasses.paramclasses.ParamClass'>, 'params': <class 'paramclasses.paramclasses.ParamClass'>, 'missing_params': <class 'paramclasses.paramclasses.ParamClass'>})
 # Works on subclasses and instances too
 ```
 
-Finally, when subclassing an external `UnknownClass`, one can check whether it is a paramclass with `isparamclass`.
+When subclassing an external `UnknownClass`, one can check whether it is a paramclass with `isparamclass`.
 ```python
 from paramclasses import isparamclass
 
 isparamclass(UnknownClass)  # Returns a boolean
 ```
+Finally, it is possible to subclass `RawParamClass` directly -- unique parent class of `ParamClass` --, when `set_params`, `params` and `missing_params` are not necessary. In this case, use signature `isparamclass(UnknownClass, raw=True)`.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
