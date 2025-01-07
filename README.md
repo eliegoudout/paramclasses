@@ -4,7 +4,7 @@
 [![pypi](https://img.shields.io/pypi/v/paramclasses)](https://pypi.org/project/paramclasses/)
 [![pipeline status](https://github.com/eliegoudout/paramclasses/actions/workflows/ci.yml/badge.svg)](https://github.com/eliegoudout/paramclasses/actions)
 [![codecov](https://codecov.io/gh/eliegoudout/paramclasses/graph/badge.svg?token=G7YIOODJXE)](https://codecov.io/gh/eliegoudout/paramclasses)
-[![mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
+[![mypy](https://img.shields.io/badge/mypy-checked-blue)](https://mypy-lang.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff#readme)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv#readme)
 
