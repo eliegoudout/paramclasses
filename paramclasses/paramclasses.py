@@ -68,13 +68,13 @@ class ProtectedError(AttributeError):
 class _MetaFrozen(type):
     """Make `_MetaParamClass` frozen with this metaclass.
 
-    We take this precaution since its attributes `default`, `protected`
-    and `missing` might be used on some occasions. While we're at it, we
-    heuristically forbid `_MetaParamClass` subclassing (soft check).
+    Legacy from when `_MetaParamClass` had exposed attributes. Keep it
+    for now as it adds a small extra robustness, and prevents natural
+    `_MetaParamClass` subclassing.
     """
 
     def __new__(mcs, name: str, bases: tuple, namespace: dict[str, object]) -> type:  # noqa: N804
-        if len(bases) != 1 or name != "_MetaParamClass" or bases[0] is not ABCMeta:
+        if not (len(bases) == 1 and name == "_MetaParamClass" and bases[0] is ABCMeta):
             msg = "`_MetaParamClass' cannot be subclassed"
             raise ProtectedError(msg)
         return super().__new__(mcs, name, bases, namespace)
