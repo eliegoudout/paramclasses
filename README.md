@@ -37,7 +37,7 @@ pip install paramclasses
     - [Type checkers](#type-checkers)
 5. [🚀 **Contributing**](#5-contributing-)
     - [Developing with `uv`](#developing-with-uv)
-6. [⚖️ **License**](#6-license-)
+6. [⚖️ **License**](#6-license-%EF%B8%8F)
 
 
 ## 1. Rationale 👩‍🏫
@@ -150,6 +150,8 @@ A(x=?, y=1)                   # ... and `A` remembers default values -- otherwis
 <traceback>
 AttributeError: Invalid parameters: {'t'}. Operation cancelled
 ```
+
+<sup>Back to [Table of Contents](#readme)👆</sup>
 
 ### Expected `getattr`, `setattr` and `delattr` behaviour
 
