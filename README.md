@@ -427,11 +427,12 @@ Before using `__slots__` with `ParamClass`, please note the following.
 
 ### Breaking `ParamClass` protection scheme
 
-There is no such thing as "perfect attribute protection" in Python. As such `ParamClass` only provides protection against natural behaviour -- and even unnatural to a _large_ extent. Below are some [knonwn](test/paramclasses/test_breaking_protection.py) easy ways to break it, representing **discouraged behaviour**. If you find other elementary ways, please report them in an [issue](https://github.com/eliegoudout/paramclasses/issues).
+There is no such thing as "perfect attribute protection" in Python. As such `ParamClass` only provides protection against natural behaviour -- and even unnatural to a _large_ extent. Below are some [knonwn](test/paramclasses/test_breaking_protection.py) **anti-patterns** to break it, representing **discouraged behaviour**. If you find other elementary ways, please report them in an [issue](https://github.com/eliegoudout/paramclasses/issues).
 
-1. Modifying `@protected` -- _huh?_
-2. Modifying or subclassing `type(ParamClass)` -- requires evil dedication.
-3. Messing with `mappingproxy`, which is [not really](https://bugs.python.org/msg391039) immutable.
+1. Using `type.__setattr__`/`type.__delattr__` directly on paramclasses.
+2. Modifying `@protected` -- _huh?_
+3. Modifying or subclassing `type(ParamClass)` -- requires evil dedication.
+4. Messing with `mappingproxy`, which is [not really](https://bugs.python.org/msg391039) immutable.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 

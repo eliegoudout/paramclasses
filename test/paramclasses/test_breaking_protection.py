@@ -84,3 +84,21 @@ def test_multiple_inheritance_may_change_protected_with_super():
 
     # ... but here `B.__repr__` is called first!
     assert repr(C()) == "Protected repr: broken!"
+
+
+def test_use_type_setattr_directly(null):
+    """Bypass MRO using `type.__setattr__` directly."""
+    class A(ParamClass):
+        x = protected(null)
+
+    # Protection works
+    assert A.x is null
+    regex = "^'x' is protected by 'A'$"
+    with pytest.raises(ProtectedError, match=regex):
+        del A.x
+
+    # Protection is bypassed
+    type.__delattr__(A, "x")
+    regex = "^type object 'A' has no attribute 'x'$"
+    with pytest.raises(AttributeError, match=regex):
+        A.x
