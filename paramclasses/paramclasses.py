@@ -1,9 +1,8 @@
 """Implements `ParamClass`."""
 
 __all__ = [
-    "DEFAULT",
+    "IMPL",
     "MISSING",
-    "PROTECTED",
     "ParamClass",
     "ProtectedError",
     "RawParamClass",
@@ -16,7 +15,7 @@ from dataclasses import dataclass
 from itertools import chain
 from reprlib import recursive_repr
 from types import MappingProxyType
-from typing import cast, final
+from typing import NamedTuple, cast, final
 from warnings import warn
 
 
@@ -28,8 +27,7 @@ class _MissingType:
         return self.repr
 
 
-DEFAULT = "__paramclass_default_"  # would-be-mangled on purpose
-PROTECTED = "__paramclass_protected_"  # would-be-mangled on purpose
+IMPL = "__paramclass_impl_"  # would-be-mangled on purpose
 MISSING = _MissingType("?")  # Sentinel object better representing missing value
 
 
@@ -121,7 +119,7 @@ def _repr_owner(*bases: type | None) -> str:
     return ", ".join(sorted(map(_mono_repr, bases)))
 
 
-def _update_while_checking_consistency(orig: dict, update: dict) -> None:
+def _update_while_checking_consistency(orig: dict, update: MappingProxyType) -> None:
     """Update `orig` with `update`, verifying consistent shared keys.
 
     Use only for protection checking.
@@ -151,15 +149,24 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
             1. Retrieves parameters and protected attributes from bases.
             2. Inspects `namespace` and its `__annotations__` to infer
                 new parameters and newly protected attributes.
+            3. Store those in `IMPL` class attribute.
         """
+
+        class Impl(NamedTuple):
+            """Details held for paramclass machinery."""
+
+            default: MappingProxyType = MappingProxyType({})
+            protected: MappingProxyType = MappingProxyType({})
+
         # # Bases: default, protected
         default: dict = {}
-        protected_special = [DEFAULT, PROTECTED, "__dict__"]
+        protected_special = [IMPL, "__dict__"]
         protected: dict = {attr: None for attr in protected_special}
         for base in bases[::-1]:
-            default |= getattr(base, DEFAULT, {})
+            default_base, protected_base = getattr(base, IMPL, Impl())
+            default |= default_base
             # Previous bases protected coherence
-            _update_while_checking_consistency(protected, getattr(base, PROTECTED, {}))
+            _update_while_checking_consistency(protected, protected_base)
             for attr in vars(base):
                 if attr in protected_special:
                     continue
@@ -197,9 +204,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
             default[attr] = namespace_final.get(attr, MISSING)
 
         # Update namespace
-        namespace_final[DEFAULT] = MappingProxyType(default)
-        namespace_final[PROTECTED] = MappingProxyType(protected)
-
+        namespace_final[IMPL] = Impl(*map(MappingProxyType, [default, protected]))
         cls = ABCMeta.__new__(mcs, name, bases, namespace_final)
 
         # Declare `cls` as owner for newly protected attributes
@@ -217,7 +222,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
             return vars_cls
 
         # Not a parameter, normal look-up
-        if attr not in vars_cls[DEFAULT]:
+        if attr not in vars_cls[IMPL].default:
             return ABCMeta.__getattribute__(cls, attr)
 
         # Parameters bypass descriptor
@@ -231,7 +236,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
     def __setattr__(cls, attr: str, val_potentially_protected: object) -> None:
         """Handle protection, missing value."""
-        _assert_unprotected(attr, getattr(cls, PROTECTED))
+        _assert_unprotected(attr, getattr(cls, IMPL).protected)
         val, was_protected = _unprotect(val_potentially_protected)
         _dont_assign_missing(attr, val)
         if was_protected:
@@ -243,7 +248,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
     def __delattr__(cls, attr: str) -> None:
         """Handle protection."""
-        _assert_unprotected(attr, getattr(cls, PROTECTED))
+        _assert_unprotected(attr, getattr(cls, IMPL).protected)
         return ABCMeta.__delattr__(cls, attr)
 
 
@@ -263,7 +268,7 @@ class RawParamClass(metaclass=_MetaParamClass):
         """Show all non-default or missing, e.g. `A(x=1, z=?)`."""
         params_str = ", ".join(
             f"{attr}={getattr(self, attr, MISSING)!r}"
-            for attr, val_default in getattr(self, DEFAULT).items()
+            for attr, val_default in getattr(self, IMPL).default.items()
             if (val_default is MISSING) or (getattr(self, attr, MISSING) != val_default)
         )
         return f"{type(self).__name__}({params_str})"
@@ -290,7 +295,7 @@ class RawParamClass(metaclass=_MetaParamClass):
 
         """
         # Set params: KEEP UP-TO-DATE with `ParamClass.set_params`!
-        wrong = set(param_values) - set(getattr(self, DEFAULT))
+        wrong = set(param_values) - set(getattr(self, IMPL).default)
         if wrong:
             msg = f"Invalid parameters: {wrong}. Operation cancelled"
             raise AttributeError(msg)
@@ -318,11 +323,11 @@ class RawParamClass(metaclass=_MetaParamClass):
             return vars_self
 
         # Remove attr from `vars(self)` if protected -- should not be there!
-        if attr in vars_self and attr in getattr(cls, PROTECTED):
+        if attr in vars_self and attr in getattr(cls, IMPL).protected:
             del vars_self[attr]
 
         # Not a parameter, normal look-up
-        if attr not in getattr(cls, DEFAULT):
+        if attr not in getattr(cls, IMPL).default:
             return object.__getattribute__(self, attr)
 
         # Parameters bypass descriptor
@@ -346,7 +351,7 @@ class RawParamClass(metaclass=_MetaParamClass):
         a parameter key.
         """
         # Handle protection, missing value
-        _assert_unprotected(attr, getattr(self, PROTECTED))
+        _assert_unprotected(attr, getattr(self, IMPL).protected)
         val, was_protected = _unprotect(val_potentially_protected)
         _dont_assign_missing(attr, val)
         if was_protected:
@@ -356,7 +361,7 @@ class RawParamClass(metaclass=_MetaParamClass):
             )
 
         # Handle callback, descriptor parameters
-        if attr in getattr(self, DEFAULT):
+        if attr in getattr(self, IMPL).default:
             self._on_param_will_be_set(attr, val)
             vars(self)[attr] = val
         else:
@@ -366,10 +371,10 @@ class RawParamClass(metaclass=_MetaParamClass):
     def __delattr__(self, attr: str) -> None:
         """Handle protection, descriptor parameters."""
         # Handle protection
-        _assert_unprotected(attr, getattr(self, PROTECTED))
+        _assert_unprotected(attr, getattr(self, IMPL).protected)
 
         # Handle descriptor parameters
-        if attr in getattr(self, DEFAULT):
+        if attr in getattr(self, IMPL).default:
             if attr not in (vars_self := vars(self)):
                 raise AttributeError(attr)
             del vars_self[attr]
@@ -413,7 +418,8 @@ class ParamClass(RawParamClass):
         __delattr__: Handle protection, descriptor parameters.
 
     Protected properties:
-        params (dict[str, object]): Current parameter dict for instance.
+        params (dict[str, object]): Copy of the current parameter dict
+            for instance.
         missing_params (tuple[str]): Parameters without value.
     """
 
@@ -421,7 +427,7 @@ class ParamClass(RawParamClass):
     # KEEP UP-TO-DATE with first part of `RawParamClass.__init__`!
     def set_params(self, **param_values: object) -> None:
         """Set multiple parameter values at once via keywords."""
-        wrong = set(param_values) - set(getattr(self, DEFAULT))
+        wrong = set(param_values) - set(getattr(self, IMPL).default)
         if wrong:
             msg = f"Invalid parameters: {wrong}. Operation cancelled"
             raise AttributeError(msg)
@@ -432,8 +438,10 @@ class ParamClass(RawParamClass):
     @protected  # type: ignore[prop-decorator]  # mypy is fooled
     @property
     def params(self) -> dict[str, object]:
-        """Current parameter dict for instance."""
-        return {attr: getattr(self, attr, MISSING) for attr in getattr(self, DEFAULT)}
+        """Copy of the current parameter dict for instance."""
+        return {
+            attr: getattr(self, attr, MISSING) for attr in getattr(self, IMPL).default
+        }
 
     @protected  # type: ignore[prop-decorator]  # mypy is fooled
     @property
@@ -441,7 +449,7 @@ class ParamClass(RawParamClass):
         """Parameters without value."""
         return tuple(
             attr
-            for attr in getattr(self, DEFAULT)
+            for attr in getattr(self, IMPL).default
             if not hasattr(self, attr) or getattr(self, attr) is MISSING
         )
 

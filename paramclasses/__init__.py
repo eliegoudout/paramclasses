@@ -1,10 +1,16 @@
 """Package implementing `ParamClass`.
 
 Exposed API:
+    IMPL:
+        To access defaults and protected of a paramclass.
+    MISSING:
+        Sentinel object better representing missing value.
     ParamClass:
         Parameter-holding class with robust subclassing protection.
     ProtectedError:
         Don't assign or delete protected attributes.
+    RawParamClass:
+        `ParamClass` without `set_params`, `params`, `missing_params`.
     isparamclass:
         Check if `cls` is a paramclass.
     protected:
@@ -12,9 +18,8 @@ Exposed API:
 """
 
 __all__ = [
-    "DEFAULT",
+    "IMPL",
     "MISSING",
-    "PROTECTED",
     "ParamClass",
     "ProtectedError",
     "RawParamClass",
@@ -23,9 +28,8 @@ __all__ = [
 ]
 
 from .paramclasses import (
-    DEFAULT,
+    IMPL,
     MISSING,
-    PROTECTED,
     ParamClass,
     ProtectedError,
     RawParamClass,

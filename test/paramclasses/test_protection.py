@@ -2,7 +2,7 @@
 
 import pytest
 
-from paramclasses import PROTECTED, ParamClass, ProtectedError, protected
+from paramclasses import IMPL, ParamClass, ProtectedError, protected
 
 
 def test_mcs_is_frozen(assert_set_del_is_protected):
@@ -35,7 +35,7 @@ def test_multiple_protection():
         @protected
         def method(self) -> None: ...
 
-    assert "method" in getattr(A, PROTECTED)
+    assert "method" in getattr(A, IMPL).protected
 
 
 def test_simple_protection_inheritance():
@@ -98,19 +98,19 @@ def test_multiple_inheritance_diamond_is_fine():
     # Diamond inheritance: OK
     class D(C, B): ...
 
-    assert getattr(D, PROTECTED)["x"] is A
+    assert getattr(D, IMPL).protected["x"] is A
 
 
 def test_cannot_slot_previously_protected():
     """Cannot slot previously protected attribute."""
     regex = (
-        r"^Cannot slot the following protected attributes: '__paramclass_protected_' "
-        r"\(from <paramclasses root protection>\), 'params' \(from 'ParamClass'\)$"
+        rf"^Cannot slot the following protected attributes: '{IMPL}' \(from "
+        r"<paramclasses root protection>\), 'params' \(from 'ParamClass'\)$"
     )
     with pytest.raises(ProtectedError, match=regex):
 
         class A(ParamClass):
-            __slots__ = ("__paramclass_protected_", "params")
+            __slots__ = (IMPL, "params")
 
 
 def test_post_creation_protection():
@@ -134,7 +134,7 @@ def test_post_creation_protection():
 
 def test_dict_is_protected():
     """Attribute `__dict__` is protected."""
-    assert "__dict__" in getattr(ParamClass, PROTECTED)
+    assert "__dict__" in getattr(ParamClass, IMPL).protected
 
 
 def test_cannot_turn_previously_protected_into_param():

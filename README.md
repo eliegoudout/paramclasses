@@ -45,7 +45,7 @@ pip install paramclasses
 
 ##### Parameter-holding classes vs. inheritance...
 
-For a _parameter_-holding class, like [dataclasses](https://docs.python.org/3/library/dataclasses.html), it would be nice to embark some inherited functionality -- _e.g._ `params` property to access current `(key, value)` pairs, `missing_params` for unassigned parameter keys,... Such inheritance would allow to factor out specialized functionality for context-dependant methods -- _e.g._ `fit`, `reset`, `plot`, etc... However, such subclassing comes with a risk of attributes conflicts, especially for libraries or exposed APIs, when users do not necessarily know every "read-only" (or "**protected**") attributes from base classes.
+For a _parameter_-holding class, like [dataclasses](https://docs.python.org/3/library/dataclasses.html), it would be nice to embark some inherited functionality -- _e.g._ `params` property to access current `(param, value)` pairs, `missing_params` for unassigned parameter keys,... Such inheritance would allow to factor out specialized functionality for context-dependant methods -- _e.g._ `fit`, `reset`, `plot`, etc... However, such subclassing comes with a risk of attributes conflicts, especially for libraries or exposed APIs, when users do not necessarily know every "read-only" (or "**protected**") attributes from base classes.
 
 ##### Our solution 😌
 
@@ -268,18 +268,15 @@ def __repr__(self) -> str:
 
 Furthermore, _as a last resort_, developers may occasionally wish to use the following module attributes.
 
-- `DEFAULT`: Current value is `"__paramclass_default_"`. Use `getattr(self, DEFAULT)` to access the dict (`mappingproxy`) of parameters' `(key, default value)` pairs.
-- `PROTECTED`: Current value is `"__paramclass_protected_"`. Use `getattr(self, PROTECTED)` to access the dict (`mappingproxy`) of `(protected attributes, owner)` pairs.
+- `IMPL`: Current value is `"__paramclass_impl_"`. Use `getattr(paramclass or instance, IMPL)` to get a `NamedTuple` instance with `default` and `protected` fields. Both are mapping proxies of, respectively, `(param, default value)` and `(protected attribute, owner)` pairs. The string `IMPL` acts as special protected key for _paramclasses_' namespaces, to leave `default` and `protected` available to users. We purposefully chose a _would-be-mangled_ name to further decrease the odds of natural conflict.
 - `MISSING`: The object representing the "missing value" in the default values of parameters. Using `instance.missing_params` should almost always be enough, but if necessary, use `val is MISSING` to check for missing values.
 
-Strings `DEFAULT` and `PROTECTED` act as special protected keys for _paramclasses_' namespaces, to leave `default` and `protected` available to users. We purposefully chose _would-be-mangled_ names to further decrease the odds of natural conflict.
-
 ```python
-# Recommended way of using `DEFAULT` and `PROTECTED`
-from paramclasses import ParamClass, DEFAULT, PROTECTED
+# Recommended way of using `IMPL`
+from paramclasses import IMPL, ParamClass
 
-getattr(ParamClass, DEFAULT)    # mappingproxy({})
-getattr(ParamClass, PROTECTED)  # mappingproxy({'__paramclass_default_': None, '__paramclass_protected_': None, '__dict__': None, '__init__': <class 'paramclasses.paramclasses.RawParamClass'>, '__getattribute__': <class 'paramclasses.paramclasses.RawParamClass'>, '__setattr__': <class 'paramclasses.paramclasses.RawParamClass'>, '__delattr__': <class 'paramclasses.paramclasses.RawParamClass'>, 'set_params': <class 'paramclasses.paramclasses.ParamClass'>, 'params': <class 'paramclasses.paramclasses.ParamClass'>, 'missing_params': <class 'paramclasses.paramclasses.ParamClass'>})
+getattr(ParamClass, IMPL).default    # mappingproxy({})
+getattr(ParamClass, IMPL).protected  # mappingproxy({'__paramclass_impl_': None, '__dict__': None, '__init__': <class 'paramclasses.paramclasses.RawParamClass'>, '__getattribute__': <class 'paramclasses.paramclasses.RawParamClass'>, '__setattr__': <class 'paramclasses.paramclasses.RawParamClass'>, '__delattr__': <class 'paramclasses.paramclasses.RawParamClass'>, 'set_params': <class 'paramclasses.paramclasses.ParamClass'>, 'params': <class 'paramclasses.paramclasses.ParamClass'>, 'missing_params': <class 'paramclasses.paramclasses.ParamClass'>})
 # Works on subclasses and instances too
 ```
 
@@ -396,7 +393,7 @@ It is possible to inherit from a mix of paramclasses and non-paramclasses, with 
 
 1. Because `type(ParamClass)` is a subclass of `ABCMeta`, non-paramclass bases must be either vanilla classes or abstract classes.
 
-2. Behaviour is not guaranteed for non-paramclass bases with attributes corresponding to either `DEFAULT` or `PROTECTED` values -- _see [Subclassing API](#3-subclassing-api-)_.
+2. Behaviour is not guaranteed for non-paramclass bases with an `IMPL`-named attribute -- _see [Subclassing API](#3-subclassing-api-)_.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
