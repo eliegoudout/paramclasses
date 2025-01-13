@@ -2,7 +2,7 @@
 
 import pytest
 
-from paramclasses import PROTECTED, ParamClass, ProtectedError, protected
+from paramclasses import IMPL, ParamClass, ProtectedError, protected
 
 
 def test_break_protection_replacing_protected():
@@ -15,7 +15,7 @@ def test_break_protection_replacing_protected():
         x = protected(0)
 
     # "x" is not added to protected attributes
-    assert getattr(A, PROTECTED) == getattr(ParamClass, PROTECTED)
+    assert getattr(A, IMPL).protected == getattr(ParamClass, IMPL).protected
 
 
 def test_break_protection_modifying_protected(monkeypatch):
@@ -28,7 +28,7 @@ def test_break_protection_modifying_protected(monkeypatch):
         x = protected(0)
 
     # "x" is not added to protected attributes
-    assert getattr(A, PROTECTED) == getattr(ParamClass, PROTECTED)
+    assert getattr(A, IMPL).protected == getattr(ParamClass, IMPL).protected
 
 
 def test_break_protection_modifying_mcs(monkeypatch):
@@ -42,7 +42,7 @@ def test_break_protection_modifying_mcs(monkeypatch):
     m.setattr(ParamClass, "__setattr__", object.__setattr__)
 
     # Try overriding a protected attribute
-    m.setattr(ParamClass(), PROTECTED, "broken!")
+    m.setattr(ParamClass(), IMPL, "broken!")
 
 
 def test_modify_mappingproxy(monkeypatch):
@@ -57,7 +57,7 @@ def test_modify_mappingproxy(monkeypatch):
             m.delitem(other, "params")
 
     instance = ParamClass()
-    protected = getattr(instance, PROTECTED)
+    protected = getattr(instance, IMPL).protected
 
     # Check "params" protection before unprotecting it
     assert "params" in protected
