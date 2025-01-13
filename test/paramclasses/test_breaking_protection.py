@@ -88,8 +88,8 @@ def test_multiple_inheritance_may_change_protected_with_super():
     assert repr(C()) == "Protected repr: broken!"
 
 
-def test_use_type_setattr_directly(null):
-    """Bypass MRO using `type.__setattr__` directly."""
+def test_use_type_methods_directly(null):
+    """Bypass MRO using `type` methods directly."""
 
     class A(ParamClass):
         x = protected(null)
