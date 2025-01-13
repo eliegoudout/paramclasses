@@ -1,6 +1,8 @@
 """Easy ways of breaking the potection."""
 
-from paramclasses import PROTECTED, ParamClass, protected
+import pytest
+
+from paramclasses import PROTECTED, ParamClass, ProtectedError, protected
 
 
 def test_break_protection_replacing_protected():
@@ -61,3 +63,45 @@ def test_modify_mappingproxy(monkeypatch):
     assert "params" in protected
     protected == Exploit()  # noqa: B015
     assert "params" not in protected
+
+
+def test_multiple_inheritance_may_change_protected_with_super():
+    """Using `super()` in protected attributes is inpredictable."""
+
+    class A(ParamClass):
+        x: ...  # type: ignore[annotation-unchecked]
+
+        @protected
+        def __repr__(self) -> str:
+            return f"Protected repr: {super().__repr__()}"
+
+    # `A.__repr__` rests on `ParamClass.__repr__`...
+    assert repr(A()) == "Protected repr: A(x=?)"
+
+    class B(ParamClass):
+        def __repr__(self) -> str:
+            return "broken!"
+
+    class C(A, B): ...
+
+    # ... but here `B.__repr__` is called first!
+    assert repr(C()) == "Protected repr: broken!"
+
+
+def test_use_type_methods_directly(null):
+    """Bypass MRO using `type` methods directly."""
+
+    class A(ParamClass):
+        x = protected(null)
+
+    # Protection works
+    assert A.x is null
+    regex = "^'x' is protected by 'A'$"
+    with pytest.raises(ProtectedError, match=regex):
+        del A.x
+
+    # Delete `A.x` despite protection
+    type.__delattr__(A, "x")
+    regex = "^type object 'A' has no attribute 'x'$"
+    with pytest.raises(AttributeError, match=regex):
+        assert A.x is null

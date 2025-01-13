@@ -32,6 +32,7 @@ pip install paramclasses
     - [Post-creation protection](#post-creation-protection)
     - [Descriptor parameters](#descriptor-parameters)
     - [Multiple inheritance](#multiple-inheritance)
+    - [`@protected` vs. `super()`](#protected-vs-super)
     - [Using `__slots__`](#using-__slots__)
     - [Breaking `ParamClass` protection scheme](#breaking-paramclass-protection-scheme)
     - [Type checkers](#type-checkers)
@@ -399,6 +400,20 @@ It is possible to inherit from a mix of paramclasses and non-paramclasses, with 
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
+### `@protected` vs. `super()`
+
+It is not recommended to use `super()` inside a `@protected` method definition, when the protection aims at "locking down" its behaviour. Indeed, one can never assume the MRO of future subclasses will ressemble that of the method-defining class.
+
+For example, picture the following inheritance schemes.
+```python
+class A(RawParamClass): ...
+class B(RawParamClass): ...
+class C(B, A): ...
+```
+In this situation, the MRO of `C` would be `C -> B -> A -> RawParamClass -> object`. As such, if `B` was to redefine `__repr__` using `super()` and `@protected`, `repr(C())` would call `A.__repr__`, which can behave arbitrarily despite `B.__repr__` being `@protected`. Instead, it is recommended to call `RawParamClass.__repr__` directly.
+
+<sup>Back to [Table of Contents](#readme)👆</sup>
+
 ### Using `__slots__`
 
 Before using `__slots__` with `ParamClass`, please note the following.
@@ -412,11 +427,12 @@ Before using `__slots__` with `ParamClass`, please note the following.
 
 ### Breaking `ParamClass` protection scheme
 
-There is no such thing as "perfect attribute protection" in Python. As such `ParamClass` only provides protection against natural behaviour -- and even unnatural to a _large_ extent. Below are some [knonwn](test/paramclasses/test_breaking_protection.py) easy ways to break it, representing **discouraged behaviour**. If you find other elementary ways, please report them in an [issue](https://github.com/eliegoudout/paramclasses/issues).
+There is no such thing as "perfect attribute protection" in Python. As such `ParamClass` only provides protection against natural behaviour -- and even unnatural to a _large_ extent. Below are some [knonwn](test/paramclasses/test_breaking_protection.py) **anti-patterns** to break it, representing **discouraged behaviour**. If you find other elementary ways, please report them in an [issue](https://github.com/eliegoudout/paramclasses/issues).
 
-1. Modifying `@protected` -- _huh?_
-2. Modifying or subclassing `type(ParamClass)` -- requires evil dedication.
-3. Messing with `mappingproxy`, which is [not really](https://bugs.python.org/msg391039) immutable.
+1. Using `type.__setattr__`/`type.__delattr__` directly on paramclasses.
+2. Modifying `@protected` -- _huh?_
+3. Modifying or subclassing `type(ParamClass)` -- requires evil dedication.
+4. Messing with `mappingproxy`, which is [not really](https://bugs.python.org/msg391039) immutable.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
