@@ -1,6 +1,8 @@
 """Easy ways of breaking the potection."""
 
-from paramclasses import PROTECTED, ParamClass, protected
+import pytest
+
+from paramclasses import PROTECTED, ParamClass, ProtectedError, protected
 
 
 def test_break_protection_replacing_protected():
@@ -61,3 +63,24 @@ def test_modify_mappingproxy(monkeypatch):
     assert "params" in protected
     protected == Exploit()  # noqa: B015
     assert "params" not in protected
+
+
+def test_multiple_inheritance_may_change_protected_with_super():
+    """Using `super()` in protected attributes is inpredictable."""
+    class A(ParamClass):
+        x: ...
+        @protected
+        def __repr__(self) -> str:
+            return f"Protected repr: {super().__repr__()}"
+
+    # `A.__repr__` rests on `ParamClass.__repr__`...
+    assert repr(A()) == "Protected repr: A(x=?)"
+
+    class B(ParamClass):
+        def __repr__(self) -> str:
+            return "broken!"
+
+    class C(A, B): ...
+
+    # ... but here `B.__repr__` is called first!
+    assert repr(C()) == "Protected repr: broken!"

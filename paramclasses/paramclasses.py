@@ -77,7 +77,7 @@ class _MetaFrozen(type):
         if not (len(bases) == 1 and name == "_MetaParamClass" and bases[0] is ABCMeta):
             msg = "`_MetaParamClass' cannot be subclassed"
             raise ProtectedError(msg)
-        return super().__new__(mcs, name, bases, namespace)
+        return type.__new__(mcs, name, bases, namespace)
 
     def __setattr__(*_: object, **__: object) -> None:
         msg = "`_MetaParamClass' attributes are frozen"
@@ -200,7 +200,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         namespace_final[DEFAULT] = MappingProxyType(default)
         namespace_final[PROTECTED] = MappingProxyType(protected)
 
-        cls = super().__new__(mcs, name, bases, namespace_final)
+        cls = ABCMeta.__new__(mcs, name, bases, namespace_final)
 
         # Declare `cls` as owner for newly protected attributes
         for attr in protected_new:
@@ -210,7 +210,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
     def __getattribute__(cls, attr: str) -> object:
         """Handle descriptor parameters."""
-        vars_cls = super().__getattribute__("__dict__")
+        vars_cls = ABCMeta.__getattribute__(cls, "__dict__")
 
         # Special case `__dict__`
         if attr == "__dict__":
@@ -218,7 +218,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
         # Not a parameter, normal look-up
         if attr not in vars_cls[DEFAULT]:
-            return super().__getattribute__(attr)
+            return ABCMeta.__getattribute__(cls, attr)
 
         # Parameters bypass descriptor
         for vars_base in chain((vars_cls,), map(vars, cls.__mro__[1:])):
@@ -239,12 +239,12 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
                 f"Cannot protect attribute '{attr}' after class creation. Ignored",
                 stacklevel=2,
             )
-        return super().__setattr__(attr, val)
+        return ABCMeta.__setattr__(cls, attr, val)
 
     def __delattr__(cls, attr: str) -> None:
         """Handle protection."""
         _assert_unprotected(attr, getattr(cls, PROTECTED))
-        return super().__delattr__(attr)
+        return ABCMeta.__delattr__(cls, attr)
 
 
 class RawParamClass(metaclass=_MetaParamClass):
@@ -309,7 +309,7 @@ class RawParamClass(metaclass=_MetaParamClass):
     def __getattribute__(self, attr: str) -> object:
         """Handle descriptor parameters."""
         cls = type(self)
-        vars_self = super().__getattribute__("__dict__")
+        vars_self = object.__getattribute__(self, "__dict__")
 
         # Special case `__dict__`, which is protected
         if attr == "__dict__":  # To save a few statements
@@ -323,7 +323,7 @@ class RawParamClass(metaclass=_MetaParamClass):
 
         # Not a parameter, normal look-up
         if attr not in getattr(cls, DEFAULT):
-            return super().__getattribute__(attr)
+            return object.__getattribute__(self, attr)
 
         # Parameters bypass descriptor
         # https://docs.python.org/3/howto/descriptor.html#invocation-from-an-instance
@@ -360,7 +360,7 @@ class RawParamClass(metaclass=_MetaParamClass):
             self._on_param_will_be_set(attr, val)
             vars(self)[attr] = val
         else:
-            super().__setattr__(attr, val)
+            object.__setattr__(self, attr, val)
 
     @protected  # type: ignore[override]  # mypy is fooled
     def __delattr__(self, attr: str) -> None:
@@ -374,7 +374,7 @@ class RawParamClass(metaclass=_MetaParamClass):
                 raise AttributeError(attr)
             del vars_self[attr]
         else:
-            super().__delattr__(attr)
+            object.__delattr__(self, attr)
 
 
 class ParamClass(RawParamClass):
@@ -456,5 +456,5 @@ def isparamclass(cls: type, *, raw: bool = False) -> bool:
         return False
 
     # Should inherit from `(Raw)ParamClass`
-    param_class = RawParamClass if raw else ParamClass
-    return any(base is param_class for base in cls.__mro__)
+    base_paramclass = RawParamClass if raw else ParamClass
+    return any(base is base_paramclass for base in cls.__mro__)
