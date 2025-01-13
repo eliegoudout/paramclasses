@@ -32,6 +32,7 @@ pip install paramclasses
     - [Post-creation protection](#post-creation-protection)
     - [Descriptor parameters](#descriptor-parameters)
     - [Multiple inheritance](#multiple-inheritance)
+    - [`@protected` vs. `super()`](#protected-vs-super)
     - [Using `__slots__`](#using-__slots__)
     - [Breaking `ParamClass` protection scheme](#breaking-paramclass-protection-scheme)
     - [Type checkers](#type-checkers)
@@ -396,6 +397,20 @@ It is possible to inherit from a mix of paramclasses and non-paramclasses, with 
 1. Because `type(ParamClass)` is a subclass of `ABCMeta`, non-paramclass bases must be either vanilla classes or abstract classes.
 
 2. Behaviour is not guaranteed for non-paramclass bases with attributes corresponding to either `DEFAULT` or `PROTECTED` values -- _see [Subclassing API](#3-subclassing-api-)_.
+
+<sup>Back to [Table of Contents](#readme)👆</sup>
+
+### `@protected` vs. `super()`
+
+It is not recommended to use `super()` inside a `@protected` method definition, when the protection aims at "locking down" its behaviour. Indeed, one can never assume the MRO of future subclasses will ressemble that of the method-defining class.
+
+For example, picture the following inheritance schemes.
+```python
+class A(RawParamClass): ...
+class B(RawParamClass): ...
+class C(B, A): ...
+```
+In this situation, the MRO of `C` would be `C -> B -> A -> RawParamClass -> object`. As such, if `B` was to redefine `__repr__` using `super()` and `@protected`, `repr(C())` would call `A.__repr__`, which can behave arbitrarily despite `B.__repr__` being `@protected`. Instead, it is recommended to call `RawParamClass.__repr__` directly.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
