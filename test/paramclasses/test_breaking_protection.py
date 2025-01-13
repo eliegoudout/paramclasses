@@ -67,8 +67,10 @@ def test_modify_mappingproxy(monkeypatch):
 
 def test_multiple_inheritance_may_change_protected_with_super():
     """Using `super()` in protected attributes is inpredictable."""
+
     class A(ParamClass):
-        x: ...
+        x: ...  # type: ignore[annotation-unchecked]
+
         @protected
         def __repr__(self) -> str:
             return f"Protected repr: {super().__repr__()}"
@@ -88,6 +90,7 @@ def test_multiple_inheritance_may_change_protected_with_super():
 
 def test_use_type_setattr_directly(null):
     """Bypass MRO using `type.__setattr__` directly."""
+
     class A(ParamClass):
         x = protected(null)
 
@@ -97,8 +100,8 @@ def test_use_type_setattr_directly(null):
     with pytest.raises(ProtectedError, match=regex):
         del A.x
 
-    # Protection is bypassed
+    # Delete `A.x` despite protection
     type.__delattr__(A, "x")
     regex = "^type object 'A' has no attribute 'x'$"
     with pytest.raises(AttributeError, match=regex):
-        A.x
+        assert A.x is null
