@@ -275,6 +275,8 @@ class RawParamClass(metaclass=_MetaParamClass):
 
     # ==================================================================================
 
+    __slots__ = ()
+
     @protected  # type: ignore[misc]  # mypy is fooled
     def __init__(
         self,
@@ -314,33 +316,43 @@ class RawParamClass(metaclass=_MetaParamClass):
     def __getattribute__(self, attr: str) -> object:
         """Handle descriptor parameters."""
         cls = type(self)
-        vars_self = object.__getattribute__(self, "__dict__")
+        msg = f"'{cls.__name__}' object has no attribute '{attr}'"
+
+        # Slotted or dict class?
+        try:
+            vars_self = object.__getattribute__(self, "__dict__")
+            has_dict = True
+        except AttributeError:
+            vars_self = {}
+            has_dict = False
 
         # Special case `__dict__`, which is protected
         if attr == "__dict__":  # To save a few statements
+            if not has_dict:
+                raise AttributeError(msg)
             if attr in vars_self:
                 del vars_self[attr]
             return vars_self
 
+        cls_impl = getattr(cls, IMPL)
         # Remove attr from `vars(self)` if protected -- should not be there!
-        if attr in vars_self and attr in getattr(cls, IMPL).protected:
+        if attr in vars_self and attr in cls_impl.protected:
             del vars_self[attr]
 
         # Not a parameter, normal look-up
-        if attr not in getattr(cls, IMPL).default:
+        if attr not in cls_impl.default:
             return object.__getattribute__(self, attr)
 
-        # Parameters bypass descriptor
+        # Parameters bypass descriptors
         # https://docs.python.org/3/howto/descriptor.html#invocation-from-an-instance
         if attr in vars_self:
             return vars_self[attr]
 
         for base in cls.__mro__:
-            if attr in vars(base):
-                return vars(base)[attr]
+            if attr in (vars_base := vars(base)):
+                return vars_base[attr]
 
         # Not found
-        msg = f"'{cls.__name__}' object has no attribute '{attr}'"
         raise AttributeError(msg)
 
     @protected  # type: ignore[override]  # mypy is fooled
@@ -350,8 +362,10 @@ class RawParamClass(metaclass=_MetaParamClass):
         Also call the `_on_param_will_be_set()` callback when `attr` is
         a parameter key.
         """
+        cls_impl = getattr(self, IMPL)
+
         # Handle protection, missing value
-        _assert_unprotected(attr, getattr(self, IMPL).protected)
+        _assert_unprotected(attr, cls_impl.protected)
         val, was_protected = _unprotect(val_potentially_protected)
         _dont_assign_missing(attr, val)
         if was_protected:
@@ -360,26 +374,41 @@ class RawParamClass(metaclass=_MetaParamClass):
                 stacklevel=2,
             )
 
-        # Handle callback, descriptor parameters
-        if attr in getattr(self, IMPL).default:
-            self._on_param_will_be_set(attr, val)
+        # Not a parameter, normal set
+        if attr not in cls_impl.default:
+            return object.__setattr__(self, attr, val)
+
+        # Parameters trigger callback and bypass descriptors
+        self._on_param_will_be_set(attr, val)
+        try:
             vars(self)[attr] = val
-        else:
-            object.__setattr__(self, attr, val)
+        except TypeError:
+            msg = "Cannot set parameter value for object without __dict__"
+            raise TypeError(msg)
 
     @protected  # type: ignore[override]  # mypy is fooled
     def __delattr__(self, attr: str) -> None:
         """Handle protection, descriptor parameters."""
-        # Handle protection
-        _assert_unprotected(attr, getattr(self, IMPL).protected)
+        cls_impl = getattr(self, IMPL)
 
-        # Handle descriptor parameters
-        if attr in getattr(self, IMPL).default:
-            if attr not in (vars_self := vars(self)):
-                raise AttributeError(attr)
-            del vars_self[attr]
-        else:
-            object.__delattr__(self, attr)
+        # Handle protection
+        _assert_unprotected(attr, cls_impl.protected)
+
+        # Not a parameter, normal set
+        if attr not in cls_impl.default:
+            return object.__delattr__(self, attr)
+
+        # Parameters bypass descriptors
+        try:
+            vars_self = vars(self)
+        except TypeError:
+            raise AttributeError(attr)
+
+        msg = f"'{type(self).__name__}' object has no attribute '{attr}'"
+        if attr not in vars_self:
+            raise AttributeError(msg)
+
+        del vars_self[attr]
 
 
 class ParamClass(RawParamClass):
@@ -422,6 +451,8 @@ class ParamClass(RawParamClass):
             for instance.
         missing_params (tuple[str]): Parameters without value.
     """
+
+    __slots__ = ()
 
     @protected
     # KEEP UP-TO-DATE with first part of `RawParamClass.__init__`!
