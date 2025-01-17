@@ -104,7 +104,7 @@ def test_multiple_inheritance_diamond_is_fine():
 def test_cannot_slot_previously_protected():
     """Cannot slot previously protected attribute."""
     regex = (
-        rf"^Cannot slot the following protected attributes: '{IMPL}' \(from "
+        rf"^cannot slot the following protected attributes: '{IMPL}' \(from "
         r"<paramclasses root protection>\), 'params' \(from 'ParamClass'\)$"
     )
     with pytest.raises(ProtectedError, match=regex):
@@ -119,14 +119,14 @@ def test_post_creation_protection():
     class A(ParamClass): ...
 
     # Class-level
-    regex = "^Cannot protect attribute 'x' after class creation. Ignored$"
+    regex = "^cannot protect attribute 'x' after class creation. Ignored$"
     with pytest.warns(UserWarning, match=regex):
         A.x = protected(0)
     assert A.x == 0
 
     # Instance-level
     a = A()
-    regex = "^Cannot protect attribute 'x' on instance assignment. Ignored$"
+    regex = "^cannot protect attribute 'x' on instance assignment. Ignored$"
     with pytest.warns(UserWarning, match=regex):
         a.x = protected(1)
     assert a.x == 1

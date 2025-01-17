@@ -97,14 +97,14 @@ def _assert_unprotected(attr: str, protected: dict[str, type | None]) -> None:
 def _assert_valid_param(attr: str) -> None:
     """Assert that `attr` is authorized as parameter name."""
     if attr.startswith("__") and attr.endswith("__"):
-        msg = f"Dunder parameters ('{attr}') are forbidden"
+        msg = f"dunder parameters ('{attr}') are forbidden"
         raise AttributeError(msg)
 
 
 def _dont_assign_missing(attr: str, val: object) -> None:
     """Forbid assigning the special 'missing value'."""
     if val is MISSING:
-        msg = f"Assigning special missing value (attribute '{attr}') is forbidden"
+        msg = f"assigning special missing value (attribute '{attr}') is forbidden"
         raise ValueError(msg)
 
 
@@ -179,7 +179,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         slots = cast(tuple, namespace.get("__slots__", ()))
         protect_then_slot = set(protected).intersection(slots)
         if protect_then_slot:
-            msg = "Cannot slot the following protected attributes: " + ", ".join(
+            msg = "cannot slot the following protected attributes: " + ", ".join(
                 f"'{attr}' (from {_repr_owner(protected[attr])})"
                 for attr in sorted(protect_then_slot)  # sort for pytest output
             )
@@ -241,7 +241,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         _dont_assign_missing(attr, val)
         if was_protected:
             warn(
-                f"Cannot protect attribute '{attr}' after class creation. Ignored",
+                f"cannot protect attribute '{attr}' after class creation. Ignored",
                 stacklevel=2,
             )
         return ABCMeta.__setattr__(cls, attr, val)
@@ -299,7 +299,7 @@ class RawParamClass(metaclass=_MetaParamClass):
         # Set params: KEEP UP-TO-DATE with `ParamClass.set_params`!
         wrong = set(param_values) - set(getattr(self, IMPL).default)
         if wrong:
-            msg = f"Invalid parameters: {wrong}. Operation cancelled"
+            msg = f"invalid parameters: {wrong}. Operation cancelled"
             raise AttributeError(msg)
 
         for attr, val in param_values.items():
@@ -370,7 +370,7 @@ class RawParamClass(metaclass=_MetaParamClass):
         _dont_assign_missing(attr, val)
         if was_protected:
             warn(
-                f"Cannot protect attribute '{attr}' on instance assignment. Ignored",
+                f"cannot protect attribute '{attr}' on instance assignment. Ignored",
                 stacklevel=2,
             )
 
@@ -383,7 +383,7 @@ class RawParamClass(metaclass=_MetaParamClass):
         try:
             vars(self)[attr] = val
         except TypeError:
-            msg = "Cannot set parameter value for object without __dict__"
+            msg = "cannot set parameter value for object without __dict__"
             raise TypeError(msg)
 
     @protected  # type: ignore[override]  # mypy is fooled
@@ -460,7 +460,7 @@ class ParamClass(RawParamClass):
         """Set multiple parameter values at once via keywords."""
         wrong = set(param_values) - set(getattr(self, IMPL).default)
         if wrong:
-            msg = f"Invalid parameters: {wrong}. Operation cancelled"
+            msg = f"invalid parameters: {wrong}. Operation cancelled"
             raise AttributeError(msg)
 
         for attr, val in param_values.items():

@@ -50,7 +50,7 @@ def test_missing_params(ParamTest, paramtest_attrs):
 
 def test_cannot_define_double_dunder_parameter():
     """Dunder parameters are forbidden."""
-    regex = r"^Dunder parameters \('__'\) are forbidden$"
+    regex = r"^dunder parameters \('__'\) are forbidden$"
     with pytest.raises(AttributeError, match=regex):
 
         class A(ParamClass):
@@ -59,7 +59,7 @@ def test_cannot_define_double_dunder_parameter():
 
 def test_cannot_assign_special_missing_value(ParamTest, paramtest_attrs):
     """Missing value can never be assigned."""
-    regex_empty = r"^Assigning special missing value \(attribute '{}'\) is forbidden$"
+    regex_empty = r"^assigning special missing value \(attribute '{}'\) is forbidden$"
     # At class creation, parameter or not
     with pytest.raises(ValueError, match=regex_empty.format("x")):
 
@@ -121,7 +121,7 @@ def test_init_and_set_params_wrong_attr_ignored(ParamTest, paramtest_attrs, null
     """Using `set_params` on non-parameters fails."""
     param_values = {attr: null for attr in paramtest_attrs()}
 
-    regex = "^Invalid parameters: {(.*?)}. Operation cancelled$"
+    regex = "^invalid parameters: {(.*?)}. Operation cancelled$"
     # Check error and match regex
     with pytest.raises(AttributeError, match=regex) as exc_init:
         ParamTest(**param_values)

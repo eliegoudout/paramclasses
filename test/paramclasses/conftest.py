@@ -85,15 +85,15 @@ def DescriptorFactories() -> dict[tuple[bool, ...], type]:
         return f"<instance of {type(obj).__name__}>"
 
     def get_method(self, obj, type: type) -> None:  # noqa: A002
-        msg = f"Used __get__(self: {desc(self)}, obj: {desc(obj)}, type: {desc(type)})"
+        msg = f"used __get__(self: {desc(self)}, obj: {desc(obj)}, type: {desc(type)})"
         raise UsedGet(msg)
 
     def set_method(self, obj, val) -> None:
-        msg = f"Used __set__(self: {desc(self)}, obj: {desc(obj)}, value: {desc(val)})"
+        msg = f"used __set__(self: {desc(self)}, obj: {desc(obj)}, value: {desc(val)})"
         raise UsedGet(msg)
 
     def delete_method(self, obj) -> None:
-        msg = f"Used __delete__(self: {desc(self)}, obj: {desc(obj)})"
+        msg = f"used __delete__(self: {desc(self)}, obj: {desc(obj)})"
         raise UsedGet(msg)
 
     _DescriptorFactories: dict[tuple[bool, ...], type] = {}
@@ -193,7 +193,7 @@ def attrs_filter() -> Callable[[tuple[str, ...], str, FilterMode], tuple[str, ..
         if mode == "none":
             return in_expr.isdisjoint(in_attr)
 
-        msg = f"Unsupported filtering mode '{mode}'"
+        msg = f"unsupported filtering mode '{mode}'"
         raise ValueError(msg)
 
     def _attrs_filter(
@@ -205,7 +205,7 @@ def attrs_filter() -> Callable[[tuple[str, ...], str, FilterMode], tuple[str, ..
         if not expr:
             return attrs
 
-        assert "_" not in expr, "Double-marker filtering disabled"
+        assert "_" not in expr, "double-marker filtering disabled"
         return tuple(attr for attr in attrs if keep_attr(attr, *expr, mode=mode))
 
     return _attrs_filter
@@ -226,7 +226,7 @@ def paramtest_attrs(
         """Get factory attributes containing f'_{expr}'."""
         out = attrs_filter(all_attrs, *expr, mode=mode)
         if not out:
-            msg = f"No factory attribute matches {expr} in mode '{mode}'"
+            msg = f"no factory attribute matches {expr} in mode '{mode}'"
             raise AttributeError(msg)
         return out
 
@@ -303,7 +303,7 @@ def obj(
         elif kind == "Vanilla":
             instance = VanillaTest()
         else:
-            msg = f"Invalid class kind '{kind}'"
+            msg = f"invalid class kind '{kind}'"
             raise ValueError(msg)
 
         if not fill_dict:
@@ -341,7 +341,7 @@ def assert_same_behaviour() -> Callable:
         mode: Literal["==", "is"],
     ) -> object:
         """Check `==` or `is' along iterable and return last value."""
-        msg_ = f"Inconsistency: {desc}" + (". Context:\n{}" if ctxt else "")
+        msg_ = f"inconsistency: {desc}" + (". Context:\n{}" if ctxt else "")
 
         no_pairs = True
         for i, (obj1, obj2) in enumerate(pairwise(iterable)):
@@ -351,11 +351,11 @@ def assert_same_behaviour() -> Callable:
             elif mode == "is":
                 assert obj1 is obj2, msg
             else:
-                msg = f"Invalid mode '{mode}' for '_assert_consistency'"
+                msg = f"invalid mode '{mode}' for '_assert_consistency'"
                 raise ValueError(msg)
             no_pairs = False
 
-        assert not no_pairs, "Provide at least 2-long iterable"
+        assert not no_pairs, "provide at least 2-long iterable"
         return obj2
 
     opattr = Literal["get", "set", "delete"]
@@ -382,7 +382,7 @@ def assert_same_behaviour() -> Callable:
             "set": lambda obj, attr: setattr(obj, attr, null),
             "delete": delattr,
         }
-        assert set(ops).issubset(do), f"Invalid ops: {ops}"
+        assert set(ops).issubset(do), f"invalid ops: {ops}"
 
         # Collect behaviour
         collected: tuple[list, ...] = tuple([] for _ in objs)

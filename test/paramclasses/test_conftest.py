@@ -85,7 +85,7 @@ def test_paramtest_attrs_raises_when_empty(paramtest_attrs):
     import re
 
     regex = (
-        f"^No factory attribute matches {re.escape(str(zero_match))} in mode '{mode}'$"
+        f"^no factory attribute matches {re.escape(str(zero_match))} in mode '{mode}'$"
     )
     with pytest.raises(AttributeError, match=regex):
         paramtest_attrs(*zero_match, mode=mode)
