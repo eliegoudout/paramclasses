@@ -2,7 +2,7 @@
 
 import pytest
 
-from paramclasses import IMPL, ParamClass, ProtectedError, protected
+from paramclasses import IMPL, ParamClass, ProtectedError, RawParamClass, protected
 
 
 def test_break_protection_replacing_protected():
@@ -33,16 +33,21 @@ def test_break_protection_modifying_protected(monkeypatch):
 
 def test_break_protection_modifying_mcs(monkeypatch):
     """Break protection by modifying `ParamClass` from the bottom up."""
-    m = monkeypatch
 
+    class A(ParamClass):
+        x = protected(0)
+
+    a = A()
+
+    with pytest.raises(ProtectedError):
+        a.x = 1  # Fails because of protection
+
+    m = monkeypatch
     m.setattr(type(type(ParamClass)), "__setattr__", type.__setattr__)
     m.setattr(type(ParamClass), "__setattr__", type.__setattr__)
-    # Also `__delattr__` because it is called by `monkeypatch` to undo.
-    m.setattr(type(ParamClass), "__delattr__", type.__delattr__)
-    m.setattr(ParamClass, "__setattr__", object.__setattr__)
+    m.setattr(RawParamClass, "__setattr__", object.__setattr__)
 
-    # Try overriding a protected attribute
-    m.setattr(ParamClass(), IMPL, "broken!")
+    a.x = 1  # Works because protection is broken
 
 
 def test_modify_mappingproxy(monkeypatch):

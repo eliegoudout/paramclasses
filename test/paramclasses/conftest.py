@@ -285,7 +285,6 @@ def VanillaTest(paramtest_namespace, unprotect) -> type:
     """Analogue to `ParamTest` for vanilla classes."""
     # Unprotect and enable dict
     namespace = {attr: unprotect(val) for attr, val in paramtest_namespace.items()}
-    namespace["__slots__"] = namespace["__slots__"] + ("__dict__",)
     return type("VanillaTest", (), namespace)
 
 
