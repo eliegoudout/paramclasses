@@ -382,9 +382,9 @@ class RawParamClass(metaclass=_MetaParamClass):
         self._on_param_will_be_set(attr, val)
         try:
             vars(self)[attr] = val
-        except TypeError:
+        except TypeError as e:
             msg = "cannot set parameter value for object without __dict__"
-            raise TypeError(msg)
+            raise TypeError(msg) from e
 
     @protected  # type: ignore[override]  # mypy is fooled
     def __delattr__(self, attr: str) -> None:
@@ -396,13 +396,14 @@ class RawParamClass(metaclass=_MetaParamClass):
 
         # Not a parameter, normal set
         if attr not in cls_impl.default:
-            return object.__delattr__(self, attr)
+            object.__delattr__(self, attr)
+            return
 
         # Parameters bypass descriptors
         try:
             vars_self = vars(self)
-        except TypeError:
-            raise AttributeError(attr)
+        except TypeError as e:
+            raise AttributeError(attr) from e
 
         msg = f"'{type(self).__name__}' object has no attribute '{attr}'"
         if attr not in vars_self:
