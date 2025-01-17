@@ -105,12 +105,18 @@ def test_cannot_slot_previously_protected():
     """Cannot slot previously protected attribute."""
     regex = (
         rf"^Cannot slot the following protected attributes: '{IMPL}' \(from "
-        r"<paramclasses root protection>\), 'params' \(from 'ParamClass'\)$"
+        r"<paramclasses root protection>\)$"
     )
     with pytest.raises(ProtectedError, match=regex):
 
         class A(ParamClass):
-            __slots__ = (IMPL, "params")
+            __slots__ = (IMPL,)
+
+    # Not necessarily given as iterable of strings
+    with pytest.raises(ProtectedError, match=regex):
+
+        class A(ParamClass):
+            __slots__ = IMPL
 
 
 def test_post_creation_protection():

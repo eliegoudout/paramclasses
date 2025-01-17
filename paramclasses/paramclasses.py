@@ -176,7 +176,8 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
         # # Namespace: handle slots, protect, store parameters
         # Cannot slot protected
-        slots = cast(tuple, namespace.get("__slots__", ()))
+        slots = namespace.get("__slots__", ())
+        slots = (slots,) if isinstance(slots, str) else cast(tuple, slots)
         protect_then_slot = set(protected).intersection(slots)
         if protect_then_slot:
             msg = "Cannot slot the following protected attributes: " + ", ".join(
