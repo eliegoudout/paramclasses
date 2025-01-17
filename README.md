@@ -280,7 +280,7 @@ getattr(ParamClass, IMPL).protected  # mappingproxy({'__paramclass_impl_': None,
 # Works on subclasses and instances too
 ```
 
-When subclassing an external `UnknownClass`, one can check whether it is a paramclass with `isparamclass`.
+When subclassing an external `UnknownClass`, one can check whether it is a _paramclass_ with `isparamclass`.
 ```python
 from paramclasses import isparamclass
 
@@ -364,7 +364,7 @@ This should not be a very common use case anyway.
 
 ### Multiple inheritance
 
-###### With paramclass bases
+###### With _paramclass_ bases
 
 Multiple inheritance is not a problem. Default values will be retrieved as expect following the MRO, but there's one caveat: protected attributes should be consistant between the bases. For example, if `A.x` is not protected while `B.x` is, one cannot take `(A, B)` for bases.
 ```python
@@ -387,13 +387,13 @@ class D(A, B): ...  # Should FAIL
 ProtectedError: 'x' protection conflict: 'A', 'B'
 ```
 
-###### Inheriting from non-paramclasses
+###### Inheriting from non-_paramclasses_
 
-It is possible to inherit from a mix of paramclasses and non-paramclasses, with the two following limitations.
+It is possible to inherit from a mix of _paramclasses_ and non-_paramclasses_, with the two following limitations.
 
-1. Because `type(ParamClass)` is a subclass of `ABCMeta`, non-paramclass bases must be either vanilla classes or abstract classes.
+1. Because `type(ParamClass)` is a subclass of `ABCMeta`, non-_paramclass_ bases must be either vanilla classes or abstract classes.
 
-2. Behaviour is not guaranteed for non-paramclass bases with an `IMPL`-named attribute -- _see [Subclassing API](#3-subclassing-api-)_.
+2. Behaviour is not guaranteed for non-_paramclass_ bases with an `IMPL`-named attribute -- _see [Subclassing API](#3-subclassing-api-)_.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
@@ -415,10 +415,10 @@ In this situation, the MRO of `C` would be `C -> B -> A -> RawParamClass -> obje
 
 Before using `__slots__` with `ParamClass`, please note the following.
 
-1. Currently paramclasses do not use `__slots__`, so any of its subclasses will still have a `__dict__`. _More on that in the future..._
-2. You **cannot** slot a previously _protected_ attribute -- since it would require replacing its value with a [member object](https://docs.python.org/3/howto/descriptor.html#member-objects-and-slots).
+1. Since `ParamClass` uses `__dict__`, any _paramclass_ will too.
+2. You **cannot** slot a previously _protected_ attribute -- since it would require updating its class value.
 3. Since parameters' get/set/delete interactions **bypass** descriptors, using `__slots__` on them **will not** yield the usual behaviour.
-4. The overhead from `ParamClass` functionality, although not high, probably nullifies any `__slots__` optimization in most use cases.
+4. The overhead from `ParamClass` functionality would nullify any `__slots__` optimization in most cases anyway.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
@@ -426,7 +426,7 @@ Before using `__slots__` with `ParamClass`, please note the following.
 
 There is no such thing as "perfect attribute protection" in Python. As such `ParamClass` only provides protection against natural behaviour -- and even unnatural to a _large_ extent. Below are some [knonwn](test/paramclasses/test_breaking_protection.py) **anti-patterns** to break it, representing **discouraged behaviour**. If you find other elementary ways, please report them in an [issue](https://github.com/eliegoudout/paramclasses/issues).
 
-1. Using `type.__setattr__`/`type.__delattr__` directly on paramclasses.
+1. Using `type.__setattr__`/`type.__delattr__` directly on _paramclasses_.
 2. Modifying `@protected` -- _huh?_
 3. Modifying or subclassing `type(ParamClass)` -- requires evil dedication.
 4. Messing with `mappingproxy`, which is [not really](https://bugs.python.org/msg391039) immutable.
