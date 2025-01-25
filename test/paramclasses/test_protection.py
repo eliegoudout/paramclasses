@@ -1,8 +1,7 @@
 """Tests directly related to @protected."""
 
-import pytest
-
 from paramclasses import IMPL, ParamClass, ProtectedError, protected
+import pytest
 
 
 def test_mcs_is_frozen(assert_set_del_is_protected):

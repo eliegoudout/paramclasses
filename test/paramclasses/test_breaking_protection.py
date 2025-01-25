@@ -1,8 +1,7 @@
 """Easy ways of breaking the potection."""
 
-import pytest
-
 from paramclasses import IMPL, ParamClass, ProtectedError, protected
+import pytest
 
 
 def test_break_protection_replacing_protected():

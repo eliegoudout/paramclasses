@@ -3,9 +3,8 @@
 import random
 import re
 
-import pytest
-
 from paramclasses import MISSING, ParamClass, isparamclass
+import pytest
 
 
 def test_slot_compatible(null):

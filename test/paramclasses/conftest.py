@@ -2,9 +2,9 @@
 
 import inspect
 from collections.abc import Callable, Iterable
-from itertools import chain, pairwise, product
+from itertools import chain, pairwise, product, starmap
 from types import MappingProxyType
-from typing import Literal
+from typing import Generator, Literal, NamedTuple
 
 import pytest
 
@@ -138,7 +138,7 @@ def paramtest_attrs_no_value() -> tuple[AttributesWithFlags, ...]:
     return (
         ("a_unprotected_parameter_with_missing", (False, True)),
         ("a_unprotected_parameter_slot", (True, True)),
-        ("a_unprotected_nonparameter_slot", (False, False)),
+        ("a_unprotected_nonparameter_slot", (True, False)),
     )
 
 
@@ -427,3 +427,212 @@ def assert_same_behaviour() -> Callable:
             )
 
     return _assert_same_behaviour
+
+
+from typing import Generator, NamedTuple
+from itertools import compress
+
+
+class AttributeKind(NamedTuple):
+    protected: bool = False
+    parameter: bool = False
+    slot: bool = False
+    missing: bool = False
+    has_get: bool = False
+    has_set: bool = False
+    has_delete: bool = False
+
+    @property
+    def has_methods(self) -> tuple[bool, bool, bool]:
+        return self.has_get, self.has_set, self.has_delete
+
+    def __str__(self) -> str:
+        base = f"{'' if self.protected else 'un'}protected_{'' if self.parameter else 'non'}parameter"
+
+        if self.slot:
+            assert not self.protected, "Cannot protect slot"
+            return f"{base}_slot"
+
+        if self.missing:
+            assert not self.protected, "Cannot protect missing"
+            assert self.parameter, "Only parameters can be missing"
+            return f"{base}_missing"
+
+        methods = "".join(compress(["get", "set", "delete"], self.has_methods)) or "non"
+        return f"{base}_with_{methods}descriptor"
+
+    def __repr__(self) -> str:
+        """Human-readable repr."""
+        _, sep, tail = type(self).__mro__[1].__repr__(self).partition("(")
+        return f"{type(self).__name__}[{self}]{sep}{tail}"
+
+
+def attribute_kinds(*filters) -> Generator[tuple[str, AttributeKind], None, None]:
+    """Generate all kinds of attributes, with filtering options."""
+    # Process filters
+    from collections import namedtuple
+    import re
+    filtered = namedtuple("Filtered", AttributeKind._fields)(*({True, False} for _ in "_" * 7))
+    for filter_ in filters:
+        if match := re.fullmatch(r"(un)?protected", filter_):
+            filtered.protected.discard(bool(match.group(1)))
+        elif match := re.fullmatch(r"(non)?parameter", filter_):
+            filtered.parameter.discard(bool(match.group(1)))
+        elif match := re.fullmatch(r"(non)?slot", filter_):
+            filtered.slot.discard(bool(match.group(1)))
+        elif match := re.fullmatch(r"(non)?missing", filter_):
+            filtered.missing.discard(bool(match.group(1)))
+        else:            
+            msg = f"Invalid filter '{filter_}'. Consider adding it if necessary"
+            raise ValueError(msg)
+
+    # General unfiltered constraints (slots, missing, others)
+    constraints = zip(
+    #    Slots          Missing  Others
+        ({False},       {False}, {True, False}),  # protected
+        ({True, False}, {True},  {True, False}),  # parameter
+        ({True},        {False}, {False}),        # slot
+        ({False},       {True},  {False}),        # missing
+        ({True},        {False}, {True, False}),  # has_get
+        ({True},        {False}, {True, False}),  # has_set
+        ({True},        {False}, {True, False})   # has_delete
+    )
+
+    def combinations_from_constraint(constraint):
+        """Generate compliant `AttributeKind` arguments."""
+        return product(*map(set.intersection, filtered, constraint))
+
+    # Yield
+    yielded = 0
+    for args in chain(*map(combinations_from_constraint, constraints)):
+        attr_kind = AttributeKind(*args)
+        yield str(attr_kind), attr_kind
+        yielded += 1
+
+    # Raise on zero match
+    if not yielded:
+        msg = f"No factory attribute matches {filters}"
+        raise ValueError(msg)
+
+    return yielded
+
+
+def _DescriptorFactories() -> dict[tuple[bool, ...], type]:
+    """All 8 (non)descriptor factories."""
+
+    class UsedGet(AttributeError): ...  # noqa: N818
+
+    class UsedSet(AttributeError): ...  # noqa: N818
+
+    class UsedDelete(AttributeError): ...  # noqa: N818
+
+    def desc(obj) -> str:
+        """To make error message comparable, no address."""
+        if inspect.isclass(obj):
+            return f"<class {obj.__name__}>"
+        return f"<instance of {type(obj).__name__}>"
+
+    def get_method(self, obj, type: type) -> None:  # noqa: A002
+        msg = f"Used __get__(self: {desc(self)}, obj: {desc(obj)}, type: {desc(type)})"
+        raise UsedGet(msg)
+
+    def set_method(self, obj, val) -> None:
+        msg = f"Used __set__(self: {desc(self)}, obj: {desc(obj)}, value: {desc(val)})"
+        raise UsedGet(msg)
+
+    def delete_method(self, obj) -> None:
+        msg = f"Used __delete__(self: {desc(self)}, obj: {desc(obj)})"
+        raise UsedGet(msg)
+
+    desc_methods = (get_method, set_method, delete_method)
+    desc_attrs = ("__get__", "__set__", "__delete__")
+    desc_titles = tuple(attr[2:-2].title() for attr in desc_attrs)
+    out = {}
+    for mask in product([True, False], repeat=3):
+        attrs = tuple(compress(desc_attrs, mask))
+        methods = tuple(compress(desc_methods, mask))
+        titles = tuple(compress(desc_titles, mask))
+        namespace = dict(zip(attrs, methods))
+        name = f"{''.join(titles) or 'Non'}DescriptorFactory"
+        out[mask] = type(name, (), namespace)
+
+    return out
+
+DescriptorFactories_ = MappingProxyType(_DescriptorFactories())
+
+
+@pytest.fixture(scope="session", autouse=True)
+def make():
+    """Generate custom class dynamically."""
+    supported_kinds_cls = frozenset({"Param", "Vanilla"})
+    supported_kinds = frozenset({"Param", "param", "param_fill", "Vanilla", "vanilla", "vanilla_fill"})
+
+    def _make(kinds: str, *attr_kinds: AttributeKind, fill: object = None) -> object:
+        kinds_tpl = tuple(kind.strip() for kind in kinds.split(","))
+        assert supported_kinds.issuperset(kinds_tpl), f"Invalid obj kind in {kinds_tpl}"
+        kinds_cls = set(kind.removesuffix("_fill").title() for kind in kinds_tpl)
+
+        # Pre-process attributes
+        slots = []
+        annotations = {}
+        vals = {}
+        attrs = []
+        for attr_kind in attr_kinds:
+            attr = str(attr_kind)
+            attrs.append(attr)
+            if attr_kind.slot:
+                slots.append(attr)
+            if attr_kind.parameter:
+                annotations[attr] = ...
+            if not attr_kind.slot and not attr_kind.missing:
+                vals[attr] = DescriptorFactories_[attr_kind.has_methods](), attr_kind.protected
+
+        # Dynamiclly create needed classes
+        classes = {}
+        for kind_cls in kinds_cls:
+            paramcls = kind_cls == "Param"
+            namespace = {"__module__": __name__}
+            for attr, (val, is_protected) in vals.items():
+                namespace[attr] = protected(val) if paramcls and is_protected else val
+
+            if slots:
+                namespace["__slots__"] = slots + ([] if paramcls else ["__dict__"])
+
+            if annotations:
+                namespace["__annotations__"] = annotations
+
+            mcs = type(ParamClass) if paramcls else type
+            name = f"{'Param' if paramcls else 'Vanilla'}Test"
+            bases = (ParamClass,) if paramcls else ()
+            classes[kind_cls] = mcs(name, bases, namespace)
+
+        # Create and return requested classes / objects
+        out = []
+        for kind in kinds_tpl:
+            # `kind` is a class
+            if kind in supported_kinds_cls:
+                out.append(classes[kind])
+                continue
+
+            # `kind` is an object
+            kind, _fill, _ = kind.partition("_fill")
+            obj = classes[kind.title()]()
+
+            # `kind` requires filling `vars(obj)`
+            if _fill:
+                for attr in attrs:
+                    vars(obj)[attr] = fill
+
+            out.append(obj)
+
+        return out if len(out) > 1 else out[0]
+
+    return _make
+
+
+def parametrize_attr_kind(*args, **kw):
+    """Parametrize attr_kind specifically."""
+    def ids(attr_or_kind) -> str:
+        return attr_or_kind if isinstance(attr_or_kind, str) else ""
+
+    return pytest.mark.parametrize("attr, kind", attribute_kinds(*args, **kw), ids=ids)
