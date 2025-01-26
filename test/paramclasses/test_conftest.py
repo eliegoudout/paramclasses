@@ -2,12 +2,12 @@
 
 import pytest
 
-from .conftest import attribute_kinds
+from .conftest import attributes_kinds
 
 
-def test_attribute_kinds_global_and_unique():
+def test_attributes_kinds_global_and_unique():
     """Check all factory attributes and uniqueness."""
-    all_attrs = next(zip(*attribute_kinds(), strict=True))
+    all_attrs = next(zip(*attributes_kinds(), strict=True))
     assert len(all_attrs) == len(set(all_attrs))
     assert sorted(all_attrs) == [
         "protected_nonparameter_with_deletedescriptor",
@@ -48,11 +48,11 @@ def test_attribute_kinds_global_and_unique():
     ]
 
 
-def test_attribute_kinds_num_results():
+def test_attributes_kinds_num_results():
     """Check a few results."""
-    expected = [35, 18, 17, 16, 19, 2, 33, 1, 34, 8]
+    expected = [35, 18, 17, 16, 19, 2, 33, 1, 34, 8, 5]
     observed = [
-        len(tuple(attribute_kinds(*expr)))
+        len(tuple(attributes_kinds(*expr)))
         for expr in [
             (),
             ("parameter",),
@@ -64,24 +64,25 @@ def test_attribute_kinds_num_results():
             ("missing",),
             ("nonmissing",),
             ("protected", "parameter"),
+            ("nondescriptor",),
         ]
     ]
     assert observed == expected
 
 
-def test_attribute_kinds_raises_when_empty():
+def test_attributes_kinds_raises_when_empty():
     """Raises `AttributeError` on zero match."""
     filters = ("parameter", "nonparameter")
     regex = r"^No factory attribute matches \('parameter', 'nonparameter'\)$"
     with pytest.raises(ValueError, match=regex):
-        next(attribute_kinds(*filters))
+        next(attributes_kinds(*filters))
 
 
-def test_attribute_kinds_raises_unknown_filter():
+def test_attributes_kinds_raises_unknown_filter():
     """Raises `AttributeError` on zero match."""
     regex = r"^Invalid filter 'unknown'. Consider adding it if necessary$"
     with pytest.raises(ValueError, match=regex):
-        next(attribute_kinds("unknown"))
+        next(attributes_kinds("unknown"))
 
 
 def test_make():

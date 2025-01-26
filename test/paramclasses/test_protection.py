@@ -1,7 +1,8 @@
 """Tests directly related to @protected."""
 
-from paramclasses import IMPL, ParamClass, ProtectedError, protected
 import pytest
+
+from paramclasses import IMPL, ParamClass, ProtectedError, protected
 
 
 def test_mcs_is_frozen(assert_set_del_is_protected):
@@ -11,14 +12,14 @@ def test_mcs_is_frozen(assert_set_del_is_protected):
     """
     mcs = type(ParamClass)
     attr = "random_attribute"
-    regex = "^`_MetaParamClass' attributes are frozen$"
+    regex = r"^`_MetaParamClass' attributes are frozen$"
     assert_set_del_is_protected(mcs, attr, regex)
 
 
 def test_cannot_subclass_mcs():
     """Cannot subclass `_MetaParamClass' (without altering its meta)."""
     mcs = type(ParamClass)
-    regex = "^`_MetaParamClass' cannot be subclassed$"
+    regex = r"^`_MetaParamClass' cannot be subclassed$"
     with pytest.raises(ProtectedError, match=regex):
 
         class Sub(mcs):
@@ -39,7 +40,7 @@ def test_multiple_protection():
 
 def test_simple_protection_inheritance():
     """Subclass cannot override protected."""
-    regex = "^'params' is protected by 'ParamClass'$"
+    regex = r"^'params' is protected by 'ParamClass'$"
     with pytest.raises(ProtectedError, match=regex):
 
         class A(ParamClass):
@@ -58,15 +59,15 @@ def test_multiple_inheritance_consistent_protection():
     class C:
         x = 0
 
-    for Other in (B, C):
+    for BC in (B, C):
         # Coherent protection order: OK
-        class D(A, Other): ...
+        class D(A, BC): ...
 
         # Incoherent protection order
-        regex = f"^'x' protection conflict: 'A', '{Other.__name__}'$"
+        regex = rf"^'x' protection conflict: 'A', '{BC.__name__}'$"
         with pytest.raises(ProtectedError, match=regex):
 
-            class D(Other, A): ...
+            class D(BC, A): ...
 
 
 def test_multiple_inheritance_protection_conflict():

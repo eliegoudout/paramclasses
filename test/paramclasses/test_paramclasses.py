@@ -1,10 +1,10 @@
 """Miscellaneous tests not directly related to protection."""
 
-import random
-import re
-
-from paramclasses import MISSING, ParamClass, isparamclass
 import pytest
+
+from paramclasses import MISSING, ParamClass, RawParamClass, isparamclass
+
+from .conftest import attributes, kinds, parametrize_attr_kind
 
 
 def test_slot_compatible(null):
@@ -19,32 +19,25 @@ def test_slot_compatible(null):
     assert "x" not in vars(a)
 
 
-# @pytest.mark.skip(reason="Don't want to monkeypatch, treat #4 before")
-def test_repr_with_missing_and_recursion(ParamTest):
-    """Show non-default and missing in `repr`, handle recursive."""
-
-    # Add recursive parameter
-    class ReprTest(ParamTest):
-        a_recursive_parameter: ...  # type:ignore[annotation-unchecked]
-
-    instance = ReprTest()
-    instance.a_recursive_parameter = instance
-
+def test_repr_with_missing_and_recursion(make):
+    """Show nondefault and missing parameters, handle recursive repr."""
+    param = make("param", *kinds("nondescriptor"))
+    param.unprotected_parameter_with_nondescriptor = param
     expected = (
-        "ReprTest("
-        "a_unprotected_parameter_with_missing=?, "
-        "a_unprotected_parameter_slot=<member 'a_unprotected_parameter_slot' of"
-        " 'ParamTest' objects>, "
-        "a_recursive_parameter=...)"
+        "ParamTest"
+        "(unprotected_parameter_missing=?,"
+        " unprotected_parameter_with_nondescriptor=...)"
     )
-    assert repr(instance) == expected
+    assert repr(param) == expected
 
 
-def test_missing_params(ParamTest, paramtest_attrs):
+def test_missing_params_property(make):
     """Test `missing_params` property."""
-    paramtest_missing = sorted(ParamTest().missing_params)
-    expected = sorted(paramtest_attrs("missing"))
-    assert expected == paramtest_missing
+    param = make("param", *kinds("missing"))
+
+    observed = param.missing_params
+    expected = tuple(attributes("missing"))
+    assert observed == expected
 
 
 def test_cannot_define_double_dunder_parameter():
@@ -56,94 +49,93 @@ def test_cannot_define_double_dunder_parameter():
             __: ...  # type:ignore[annotation-unchecked]
 
 
-def test_cannot_assign_special_missing_value(ParamTest, paramtest_attrs):
+def test_cannot_assign_special_missing_value_at_class_creation():
     """Missing value can never be assigned."""
-    regex_empty = r"^Assigning special missing value \(attribute '{}'\) is forbidden$"
-    # At class creation, parameter or not
-    with pytest.raises(ValueError, match=regex_empty.format("x")):
+    regex = r"^Assigning special missing value \(attribute 'x'\) is forbidden$"
+    with pytest.raises(ValueError, match=regex):
 
         class A(ParamClass):
             x = MISSING
 
-    with pytest.raises(ValueError, match=regex_empty.format("x")):
+    with pytest.raises(ValueError, match=regex):
 
         class B(ParamClass):
             x: ... = MISSING  # type:ignore[annotation-unchecked]
 
-    # After class creation: test for every kind of unprotected afftributes
-    for attr in paramtest_attrs("unprotected"):
-        regex = regex_empty.format(attr)
-        # Class level
+
+@parametrize_attr_kind("unprotected")
+def test_cannot_assign_special_missing_value_after_class_creation(attr, kind, make):
+    """Missing value can never be assigned."""
+    regex = rf"^Assigning special missing value \(attribute '{attr}'\) is forbidden$"
+
+    for obj in make("param, Param", kind):
         with pytest.raises(ValueError, match=regex):
-            setattr(ParamTest, attr, MISSING)
-
-        # Instance level
-        with pytest.raises(ValueError, match=regex):
-            setattr(ParamTest(), attr, MISSING)
+            setattr(obj, attr, MISSING)
 
 
-def test_init_and_set_params_works(ParamTest, paramtest_attrs, null):
+@parametrize_attr_kind("unprotected", "parameter")
+def test_init_and_set_params_work(attr, kind, make, null):
     """For parameters, `set_params` works fine."""
-    param_values = {attr: null for attr in paramtest_attrs("unprotected", "parameter")}
-    instance_init = ParamTest(**param_values)
-    instance_set_params = ParamTest()
-    instance_set_params.set_params(**param_values)
+    Param, param_set_params = make("Param, param", kind)
+    kw = {attr: null}
+    param_init = Param(**kw)
+    param_set_params.set_params(**kw)
 
-    for instance in [instance_init, instance_set_params]:
-        assert all(getattr(instance, attr) is null for attr in param_values)
-
-
-def test_params(ParamTest, paramtest_attrs, null):
-    """Test `params` property.
-
-    Half randomly chosen parameters are assigned a `null` value before.
-    """
-    random.seed(0)
-    unprotected = paramtest_attrs("unprotected", "parameter")
-    assigned_null = random.sample(unprotected, len(unprotected) // 2)
-
-    instance = ParamTest()
-    parameters = paramtest_attrs("parameter")
-    expected = {attr: getattr(ParamTest, attr, MISSING) for attr in parameters}
-    for attr in assigned_null:
-        setattr(instance, attr, null)
-        expected[attr] = null
-
-    observed = instance.params
-
-    # Check equal keys and same object values
-    assert sorted(observed.keys()) == sorted(expected.keys())
-    assert all(observed[attr] is expected[attr] for attr in observed)
+    assert getattr(param_init, attr) is null
+    assert getattr(param_set_params, attr) is null
 
 
-def test_init_and_set_params_wrong_attr_ignored(ParamTest, paramtest_attrs, null):
-    """Using `set_params` on non-parameters fails."""
-    param_values = {attr: null for attr in paramtest_attrs()}
+@parametrize_attr_kind()
+def test_params_property(attr, kind, make, null):
+    """Test `params` property, before and afer assignment."""
+    Param, param = make("Param, param", kind)
 
-    regex = "^Invalid parameters: {(.*?)}. Operation cancelled$"
+    # Before assignment
+    expected_before = {attr: getattr(Param, attr, MISSING)} if kind.parameter else {}
+    assert param.params == expected_before
+
+    # Do not set protected or descriptor-handled attributes
+    descriptor_handled_set = not kind.parameter and (kind.has_set or kind.has_delete)
+    if kind.protected or descriptor_handled_set:
+        return
+
+    # After assignment
+    setattr(param, attr, null)
+    expected_after = {attr: null} if kind.parameter else {}
+    assert param.params == expected_after
+
+
+@parametrize_attr_kind("nonparameter")
+def test_init_and_set_params_raise_on_nonparameter(attr, kind, make, null):
+    """Using `set_params` on nonparameters fails."""
+    Param, param_set_params = make("Param, param", kind)
+    kw = {attr: null}
+
     # Check error and match regex
-    with pytest.raises(AttributeError, match=regex) as exc_init:
-        ParamTest(**param_values)
+    regex = rf"^Invalid parameters: {{'{attr}'}}. Operation cancelled$"
+    with pytest.raises(AttributeError, match=regex):
+        Param(**kw)
 
-    with pytest.raises(AttributeError, match=regex) as exc_set_params:
-        ParamTest().set_params(**param_values)
-
-    # Check list of non parameters
-    expected = sorted(paramtest_attrs("nonparameter"))
-    for excinfo in [exc_init, exc_set_params]:
-        nonparams_str = re.match(regex, str(excinfo.value)).group(1)
-        observed = sorted(attr_repr[1:-1] for attr_repr in nonparams_str.split(", "))
-
-        assert expected == observed
+    with pytest.raises(AttributeError, match=regex):
+        param_set_params.set_params(**kw)
 
 
-def test_isparamclass_works_even_against_virtual(ParamTest):
+def test_isparamclass_works_even_against_virtual(make):
     """Test `isparamclass`,  also against virtual subclassing."""
-    assert isparamclass(ParamTest)
+    Param, Vanilla = make("Param, Vanilla")
 
-    class NonParamClass: ...
+    assert isparamclass(Param)
 
-    # Not trivially fooled by virtual subclassing
-    ParamClass.register(NonParamClass)
-    assert issubclass(NonParamClass, ParamClass)
-    assert not isparamclass(NonParamClass)
+    # Robust against virtual subclassing, unlike built-in `issubclass`
+    ParamClass.register(Vanilla)
+    assert issubclass(Vanilla, ParamClass)
+    assert not isparamclass(Vanilla)
+
+
+def test_isparamclass_raw():
+    """Test `isparamclass` in `raw` mode."""
+
+    class RawParam(RawParamClass): ...
+
+    assert not isparamclass(RawParam)
+    assert isparamclass(RawParam, raw=True)
