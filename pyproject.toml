@@ -1,6 +1,6 @@
 [project]
 name = "paramclasses"
-version = "0.3.0"
+version = "0.3.1"
 description = "Parameter-holding classes with robust subclassing protection"
 readme = "README.md"
 license = {file = "LICENSE"}
