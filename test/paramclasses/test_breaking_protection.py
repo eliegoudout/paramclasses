@@ -96,12 +96,12 @@ def test_use_type_methods_directly(null):
 
     # Protection works
     assert A.x is null
-    regex = "^'x' is protected by 'A'$"
+    regex = r"^'x' is protected by 'A'$"
     with pytest.raises(ProtectedError, match=regex):
         del A.x
 
     # Delete `A.x` despite protection
     type.__delattr__(A, "x")
-    regex = "^type object 'A' has no attribute 'x'$"
+    regex = r"^type object 'A' has no attribute 'x'$"
     with pytest.raises(AttributeError, match=regex):
-        assert A.x is null
+        A.x  # noqa: B018, not "useless"
