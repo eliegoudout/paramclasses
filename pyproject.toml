@@ -50,9 +50,16 @@ files = ["paramclasses", "test"]
 testpaths = "test"
 addopts = [
     "--import-mode=importlib",  # Recommended by pytest
-    "--cov=paramclasses",
-    "--cov-report=term-missing",
+    "--cov",
 ]
+
+[tool.coverage.run]
+source = ["paramclasses", "test"]
+
+[tool.coverage.report]
+precision = 2
+skip_empty = true
+show_missing = true
 
 
 [build-system]

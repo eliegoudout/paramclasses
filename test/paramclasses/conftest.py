@@ -59,13 +59,10 @@ def assert_same_behaviour() -> Callable:
         no_pairs = True
         for i, (obj1, obj2) in enumerate(pairwise(iterable)):
             msg = msg_.format(ctxt(i)) if ctxt else msg_
-            if mode == "==":
-                assert obj1 == obj2, msg
-            elif mode == "is":
+            if mode == "is":
                 assert obj1 is obj2, msg
             else:
-                msg = f"Invalid mode '{mode}' for '_assert_consistency'"
-                raise ValueError(msg)
+                assert obj1 == obj2, msg
             no_pairs = False
 
         assert not no_pairs, "Provide at least 2-long iterable"
@@ -183,11 +180,7 @@ class _AttributeKind(NamedTuple):
 
     def __repr__(self) -> str:
         """Human-readable repr for debug."""
-        # Weird shenanigans because `NamedTuple` is not a real class -- cf. source
-        # code --, so `super().__repr__()` or `NamedTuple.__repr__(self)` do not work
-        super_repr = type(self).__mro__[1].__repr__(self)  # type: ignore[call-arg]
-        _, sep, tail = super_repr.partition("(")
-        return f"{type(self).__name__}[{self}]{sep}{tail}"
+        return f"{type(self).__name__}[{self}]{tuple(self)}"
 
 
 def attributes_kinds(*filters: str) -> Generator[tuple[str, _AttributeKind], None, int]:

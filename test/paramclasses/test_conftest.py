@@ -2,7 +2,7 @@
 
 import pytest
 
-from .conftest import attributes_kinds
+from .conftest import attributes_kinds, kinds
 
 
 def test_attributes_kinds_global_and_unique():
@@ -83,6 +83,16 @@ def test_attributes_kinds_raises_unknown_filter():
     regex = r"^Invalid filter 'unknown'. Consider adding it if necessary$"
     with pytest.raises(ValueError, match=regex):
         next(attributes_kinds("unknown"))
+
+
+def test_attributekind_repr_human_readable():
+    """Check that `_AttributeKind` repr is human-readable for debug."""
+    kind = next(kinds("missing"))
+    expected = (
+        "_AttributeKind[unprotected_parameter_missing]"
+        "(False, True, False, True, False, False, False)"
+    )
+    assert repr(kind) == expected
 
 
 def test_make():
