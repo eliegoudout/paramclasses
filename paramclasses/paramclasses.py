@@ -12,7 +12,6 @@ __all__ = [
 
 from abc import ABCMeta
 from dataclasses import dataclass
-from itertools import chain
 from reprlib import recursive_repr
 from types import MappingProxyType
 from typing import NamedTuple, cast, final
@@ -227,9 +226,12 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
             return ABCMeta.__getattribute__(cls, attr)
 
         # Parameters bypass descriptor
-        for vars_base in chain((vars_cls,), map(vars, cls.__mro__[1:])):
+        if attr in vars_cls:
+            return vars_cls[attr]
+
+        for vars_base in map(vars, cls.__mro__[1:]):
             if attr in vars_base:
-                return vars_cls[attr]
+                return vars_base[attr]
 
         # Not found
         msg = f"type object '{cls.__name__}' has no attribute '{attr}'"
