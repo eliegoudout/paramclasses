@@ -7,7 +7,7 @@ This is done according to the following expectations, in three sections:
 
           ╭──────────────────────────────────────┬─────────────────────────────────────╮
    IMPLEM │               Parameters             │             Non-Parameters          │
- EXPECTED ├───────────────────┬──────────────────┤──────────────────┬──────────────────┤
+ EXPECTED ├───────────────────┬──────────────────┼──────────────────┬──────────────────┤
 BEHAVIOUR │     Protected     │   Unprotected    │    Protected     │   Unprotected    │
 ╭─────────┼───────────────────┼──────────────────┼──────────────────┼──────────────────┤
 │ getattr │Bypass Descriptors*│Bypass Descriptors│     Vanilla*     │     Vanilla      │
@@ -46,9 +46,9 @@ def test_behaviour_set_del_protected_class_and_instances(
     assert_set_del_is_protected,
 ):
     """Test protection."""
-    regex = None
-    for obj in make("Param, param, param_fill", kind):
-        regex = regex or f"^'{attr}' is protected by '{obj.__name__}'"
+    objs = make("Param, param, param_fill, ParamChild, paramchild, paramchild_fill", kind)
+    regex = f"^'{attr}' is protected by '{objs[0].__name__}'"
+    for obj in objs:
         assert_set_del_is_protected(obj, attr, regex)
 
 
@@ -78,6 +78,7 @@ def test_behaviour_get_set_delete_unprotected_nonparameter_class_level(
         return
 
     assert_same_behaviour(*make("Param, Vanilla", kind), attr=attr, ops=ops)
+    assert_same_behaviour(*make("ParamChild, VanillaChild", kind), attr=attr, ops=ops)\\INVESTIGATE!!
 
 
 @parametrize_attr_kind("slot")

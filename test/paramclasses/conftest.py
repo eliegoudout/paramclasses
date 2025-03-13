@@ -319,15 +319,34 @@ def make() -> Callable:  # noqa: C901  # Prefer complexity over modularization h
             objects for instances, but the same class for classes.
 
     """
-    supported_targets_cls = frozenset({"Param", "Vanilla"})
+    supported_targets_cls = frozenset({"Param", "ParamChild", "Vanilla", "VanillaChild"})
     supported_targets = frozenset({
         "Param",
+        "ParamChild",
         "param",
+        "paramchild",
         "param_fill",
+        "paramchild_fill",
         "Vanilla",
+        "VanillaChild",
         "vanilla",
+        "vanillachild",
         "vanilla_fill",
+        "vanillachild_fill",
     })
+
+    def parse_target(target: str) -> tuple[str, bool, bool, bool, bool]:
+        """root, cls_is_child, target_is_cls, target_is_fill"""
+        target_is_fill = target.endswith("_fill")
+        target_clip = target.removesuffix("_fill")
+
+        target_is_cls = target_clip[0].isupper()
+        target_clip_low = target_clip.lower()
+
+        cls_is_child = target_clip_low.endswith("child")
+        root = target_clip_low.removesuffix("child").title()
+
+        return root, cls_is_child, target_is_cls, target_is_fill
 
     def _make(  # noqa: C901  # Prefer complexity over modularization here
         targets: str,
@@ -336,7 +355,8 @@ def make() -> Callable:  # noqa: C901  # Prefer complexity over modularization h
     ) -> object | list[object]:
         targets_tpl = tuple(target.strip() for target in targets.split(","))
         assert supported_targets.issuperset(targets_tpl), f"Wrong targets {targets_tpl}"
-        targets_cls = {target.removesuffix("_fill").title() for target in targets_tpl}
+        required_cls = {parse_target(target)[:2] for target in targets_tpl}
+        required_roots = {required_root for required_root, _ in required_cls}
 
         # Pre-process attributes
         slots = []
@@ -355,10 +375,10 @@ def make() -> Callable:  # noqa: C901  # Prefer complexity over modularization h
                 is_protected = attr_kind.protected
                 vals[attr] = val, is_protected
 
-        # Dynamiclly create needed classes
-        classes = {}
-        for target_cls in targets_cls:
-            paramcls = target_cls == "Param"
+        # Dynamiclly create needed root classes (Param and / or Vanilla)
+        roots = {}
+        for root in required_roots:
+            paramcls = root == "Param"
             namespace: dict[str, object] = {"__module__": __name__}
             for attr, (val, is_protected) in vals.items():
                 namespace[attr] = protected(val) if paramcls and is_protected else val
@@ -372,22 +392,31 @@ def make() -> Callable:  # noqa: C901  # Prefer complexity over modularization h
             mcs = type(ParamClass) if paramcls else type
             name = f"{'Param' if paramcls else 'Vanilla'}Test"
             bases = (ParamClass,) if paramcls else ()
-            classes[target_cls] = mcs(name, bases, namespace)
+            roots[root] = mcs(name, bases, namespace)
+
+        # Dynamically create needed classes
+        classes = {}
+        for root, cls_is_child in required_cls:
+            root_cls = roots[root]
+            cls = type(root_cls)(f"{root}Child", (root_cls,), {}) if cls_is_child else root_cls
+            classes[(root, cls_is_child)] = cls
 
         # Create and return requested classes / instances
         out = []
         for target in targets_tpl:
+            root, cls_is_child, target_is_cls, target_is_fill = parse_target(target)
+            cls = classes[(root, cls_is_child)]
             # `target` is a class
-            if target in supported_targets_cls:
-                out.append(classes[target])
+            if target_is_cls:
+                out.append(cls)
                 continue
 
             # `target` is an instance
             target_base, _fill, _ = target.partition("_fill")
-            instance = classes[target_base.title()]()
+            instance = cls()
 
             # `target` requires filling `vars(instance)`
-            if _fill:
+            if target_is_fill:
                 for attr in attrs:
                     vars(instance)[attr] = fill
 
