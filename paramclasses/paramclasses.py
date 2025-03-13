@@ -70,7 +70,7 @@ class _MetaFrozen(type):
     `_MetaParamClass` subclassing.
     """
 
-    def __new__(mcs, name: str, bases: tuple, namespace: dict[str, object]) -> type:  # noqa: N804
+    def __new__(mcs, name: str, bases: tuple, namespace: dict[str, object]) -> type:
         if not (len(bases) == 1 and name == "_MetaParamClass" and bases[0] is ABCMeta):
             msg = "`_MetaParamClass' cannot be subclassed"
             raise ProtectedError(msg)
@@ -141,7 +141,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     be compatible with its functionality.
     """
 
-    def __new__(mcs, name: str, bases: tuple, namespace: dict[str, object]) -> type:  # noqa: N804
+    def __new__(mcs, name: str, bases: tuple, namespace: dict[str, object]) -> type:
         """Most of `_MetaParamClass` logic.
 
         It essentially does the following.
@@ -160,7 +160,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         # # Bases: default, protected
         default: dict = {}
         protected_special = [IMPL, "__dict__"]
-        protected: dict = {attr: None for attr in protected_special}
+        protected = dict.fromkeys(protected_special)
         for base in bases[::-1]:
             default_base, protected_base = getattr(base, IMPL, Impl())
             default |= default_base
@@ -176,7 +176,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         # # Namespace: handle slots, protect, store parameters
         # Cannot slot protected
         slots = namespace.get("__slots__", ())
-        slots = (slots,) if isinstance(slots, str) else cast(tuple, slots)
+        slots = (slots,) if isinstance(slots, str) else cast("tuple", slots)
         protect_then_slot = set(protected).intersection(slots)
         if protect_then_slot:
             msg = "Cannot slot the following protected attributes: " + ", ".join(
@@ -197,7 +197,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
                 protected_new.append(attr)
 
         # Store new parameters and default
-        annotations: dict = cast(dict, namespace.get("__annotations__", {}))
+        annotations: dict = cast("dict", namespace.get("__annotations__", {}))
         for attr in annotations:
             _assert_unprotected(attr, protected)
             _assert_valid_param(attr)
@@ -313,8 +313,8 @@ class RawParamClass(metaclass=_MetaParamClass):
             kwargs = {}
         self.__post_init__(*args, **kwargs)
 
-    @protected  # type: ignore[override]  # mypy is fooled
-    def __getattribute__(self, attr: str) -> object:
+    @protected
+    def __getattribute__(self, attr: str) -> object:  # type: ignore[override]  # mypy is fooled
         """Handle descriptor parameters."""
         cls = type(self)
         vars_self = object.__getattribute__(self, "__dict__")
@@ -346,8 +346,8 @@ class RawParamClass(metaclass=_MetaParamClass):
         msg = f"'{cls.__name__}' object has no attribute '{attr}'"
         raise AttributeError(msg)
 
-    @protected  # type: ignore[override]  # mypy is fooled
-    def __setattr__(self, attr: str, val_potentially_protected: object) -> None:
+    @protected
+    def __setattr__(self, attr: str, val_potentially_protected: object) -> None:  # type: ignore[override]  # mypy is fooled
         """Handle protection, missing value, descriptor parameters.
 
         Also call the `_on_param_will_be_set()` callback when `attr` is
@@ -370,8 +370,8 @@ class RawParamClass(metaclass=_MetaParamClass):
         else:
             object.__setattr__(self, attr, val)
 
-    @protected  # type: ignore[override]  # mypy is fooled
-    def __delattr__(self, attr: str) -> None:
+    @protected
+    def __delattr__(self, attr: str) -> None:  # type: ignore[override]  # mypy is fooled
         """Handle protection, descriptor parameters."""
         # Handle protection
         _assert_unprotected(attr, getattr(self, IMPL).protected)
