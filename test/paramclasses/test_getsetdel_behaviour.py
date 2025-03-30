@@ -33,6 +33,8 @@ dealing with multiple degree of freedom:
 Only simple inheritance is tested here.
 """
 
+import sys
+
 import pytest
 
 from .conftest import parametrize_attr_kind
@@ -272,7 +274,11 @@ def test_delete_behaviour_unprotected_parameter_class_level(attr, kind, make):
             assert attr not in vars(cls)
             continue
 
-        regex = f"^type object '{cls.__name__}' has no attribute '{attr}'$"
+        if sys.version_info >= (3, 11):
+            regex = f"^type object '{cls.__name__}' has no attribute '{attr}'$"
+        else:
+            regex = f"^{attr}$"
+
         with pytest.raises(AttributeError, match=regex):
             delattr(cls, attr)
 
