@@ -274,10 +274,10 @@ def test_delete_behaviour_unprotected_parameter_class_level(attr, kind, make):
             assert attr not in vars(cls)
             continue
 
-        if sys.version_info >= (3, 11):
-            regex = f"^type object '{cls.__name__}' has no attribute '{attr}'$"
-        else:
-            regex = f"^{attr}$"
+        old = sys.version_info < (3, 11)
+        prefix = "" if old else f"type object '{cls.__name__}' has no attribute '"
+        suffix = "" if old else "'"
+        regex = f"^{prefix}{attr}{suffix}$"
 
         with pytest.raises(AttributeError, match=regex):
             delattr(cls, attr)
