@@ -97,16 +97,19 @@ def assert_same_behaviour() -> Callable:
         # Collect behaviour
         collected: tuple[list, ...] = tuple([] for _ in objs)
         for (i, obj), op in product(enumerate(objs), ops):
-            # Unify classname before collecting, to unify error messages.
+            # Unify module/qualname/name before collecting, to unify error messages.
             cls: type = obj if are_classes else type(obj)  # type: ignore[assignment]
-            name = cls.__name__
+            module = cls.__module__
             qualname = cls.__qualname__
-            cls.__qualname__ = "UniqueQualnameClass"
-            cls.__name__ = "UniqueNameClass"
+            name = cls.__name__
+            cls.__module__ = "CommonModule"
+            cls.__qualname__ = "CommonQualnameClass"
+            cls.__name__ = "CommonNameClass"
             try:
                 collected[i].append((name, False, do[op](obj, attr)))
             except AttributeError as e:
                 collected[i].append((name, True, f"{type(e).__name__}: {e}"))
+            cls.__module__ = module
             cls.__qualname__ = qualname
             cls.__name__ = name
 
@@ -292,20 +295,23 @@ _DescriptorFactories = MappingProxyType(__DescriptorFactories())
 
 
 @pytest.fixture(scope="session")
-def make() -> Callable:  # noqa: C901  # Prefer complexity over modularization here
+def make() -> Callable:  # noqa: C901, PLR0915  # Prefer complexity over modularization here
     """Generate target classes or instances dynamically.
 
     Factory for paramclass or vanilla class, or their instances.
 
     Arguments:
         targets (str): Coma-separated list of targets amongst `{"Param",
-            "param", "param_fill", "Vanilla", "vanilla",
-            "vanilla_fill"}`. The first and second half respectively
-            refer to paramclass and vanilla objects. Capitalized targets
-            are classes, non-capitalized are instances of these.
-            Trailing `"_fill"` denotes instances with filled dict, using
-            keys corresponding to `attr_kinds` and `fill` value. Targets
-            can be repeated multiple times.
+            "ParamChild", "Vanilla", "VanillaChild", "param",
+            "param_fill", "paramchild", "paramchild_fill", "vanilla",
+            "vanilla_fill", "vanillachild", "vanillachild_fill"}`.
+            Capitalized targets are classes, noncapitalized are
+            instances of these. Classes with "Child" are trivially
+            inherited from the related "Param" or "Vanilla" class,
+            meaning no class attribute is redefined. Trailing `"_fill"`
+            denotes instances with filled dict, using keys corresponding
+            to `attr_kinds` and `fill` value. Targets can be repeated
+            multiple times.
         *attr_kinds (_AttributeKind): The kind of attributes to be added
             to the dynamically created classes' namespace. Protection is
             ignored for vanilla classes.
@@ -319,24 +325,25 @@ def make() -> Callable:  # noqa: C901  # Prefer complexity over modularization h
             objects for instances, but the same class for classes.
 
     """
-    supported_targets_cls = frozenset({"Param", "ParamChild", "Vanilla", "VanillaChild"})
-    supported_targets = frozenset({
+    supported_targets_cls = frozenset({
         "Param",
         "ParamChild",
-        "param",
-        "paramchild",
-        "param_fill",
-        "paramchild_fill",
         "Vanilla",
         "VanillaChild",
+    })
+    supported_targets = supported_targets_cls.union({
+        "param",
+        "param_fill",
+        "paramchild",
+        "paramchild_fill",
         "vanilla",
-        "vanillachild",
         "vanilla_fill",
+        "vanillachild",
         "vanillachild_fill",
     })
 
-    def parse_target(target: str) -> tuple[str, bool, bool, bool, bool]:
-        """root, cls_is_child, target_is_cls, target_is_fill"""
+    def parse_target(target: str) -> tuple[str, bool, bool, bool]:
+        """root, cls_is_child, target_is_cls, target_is_fill."""
         target_is_fill = target.endswith("_fill")
         target_clip = target.removesuffix("_fill")
 
@@ -348,7 +355,7 @@ def make() -> Callable:  # noqa: C901  # Prefer complexity over modularization h
 
         return root, cls_is_child, target_is_cls, target_is_fill
 
-    def _make(  # noqa: C901  # Prefer complexity over modularization here
+    def _make(  # noqa: C901, PLR0912  # Prefer complexity over modularization here
         targets: str,
         *attr_kinds: _AttributeKind,
         fill: object = None,
@@ -398,7 +405,8 @@ def make() -> Callable:  # noqa: C901  # Prefer complexity over modularization h
         classes = {}
         for root, cls_is_child in required_cls:
             root_cls = roots[root]
-            cls = type(root_cls)(f"{root}Child", (root_cls,), {}) if cls_is_child else root_cls
+            name = f"{root}ChildTest"
+            cls = type(root_cls)(name, (root_cls,), {}) if cls_is_child else root_cls
             classes[(root, cls_is_child)] = cls
 
         # Create and return requested classes / instances

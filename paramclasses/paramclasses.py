@@ -231,7 +231,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
         for vars_base in map(vars, cls.__mro__[1:]):
             if attr in vars_base:
-                return vars_cls[attr]  # ERROR ON PURPOSE, should be `vars_base`
+                return vars_base[attr]
 
         # Not found
         msg = f"type object '{cls.__name__}' has no attribute '{attr}'"
