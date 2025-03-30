@@ -5,6 +5,7 @@
 [![pipeline status](https://github.com/eliegoudout/paramclasses/actions/workflows/ci.yml/badge.svg)](https://github.com/eliegoudout/paramclasses/actions)
 [![codecov](https://codecov.io/gh/eliegoudout/paramclasses/graph/badge.svg?token=G7YIOODJXE)](https://codecov.io/gh/eliegoudout/paramclasses)
 [![mypy](https://img.shields.io/badge/mypy-checked-blue)](https://mypy-lang.org/)
+![typed](https://img.shields.io/pypi/types/paramclasses)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff#readme)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv#readme)
 
