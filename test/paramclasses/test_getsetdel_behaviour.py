@@ -7,7 +7,7 @@ This is done according to the following expectations, in three sections:
 
           ╭──────────────────────────────────────┬─────────────────────────────────────╮
    IMPLEM │               Parameters             │             Non-Parameters          │
- EXPECTED ├───────────────────┬──────────────────┤──────────────────┬──────────────────┤
+ EXPECTED ├───────────────────┬──────────────────┼──────────────────┬──────────────────┤
 BEHAVIOUR │     Protected     │   Unprotected    │    Protected     │   Unprotected    │
 ╭─────────┼───────────────────┼──────────────────┼──────────────────┼──────────────────┤
 │ getattr │Bypass Descriptors*│Bypass Descriptors│     Vanilla*     │     Vanilla      │
@@ -17,20 +17,23 @@ BEHAVIOUR │     Protected     │   Unprotected    │    Protected     │   
 │ delattr │  ProtectedError   │Bypass Descriptors│  ProtectedError  │     Vanilla      │
 ╰─────────┴───────────────────┴──────────────────┴──────────────────┴──────────────────╯
 
-Vanilla means "same outputs or same error typeS and messageS as vanilla classes".
-The * means that `get` should ignore and remove any `vars(instance)` entry. We don't
-    check for the warning.
+Vanilla means "same outputs or same error typeS and messageS as vanilla
+classes".
+The * means that `get` should ignore and remove any `vars(instance)`
+entry. We don't check for the warning.
 
-The difficulty lies in generating every possible attribute scenario, dealing with
-multiple degree of freedom:
+The difficulty lies in generating every possible attribute scenario,
+dealing with multiple degree of freedom:
 - operations at class or instance level,
 - class values with or without get/set/delete,
 - missing value parameter,
 - slot members,
 - instances with or without filled dict.
 
-Inheritance is not tested here.
+Only simple inheritance is tested here.
 """
+
+import sys
 
 import pytest
 
@@ -46,9 +49,12 @@ def test_behaviour_set_del_protected_class_and_instances(
     assert_set_del_is_protected,
 ):
     """Test protection."""
-    regex = None
-    for obj in make("Param, param, param_fill", kind):
-        regex = regex or f"^'{attr}' is protected by '{obj.__name__}'"
+    objs = make(
+        "Param, param, param_fill, ParamChild, paramchild, paramchild_fill",
+        kind,
+    )
+    regex = f"^'{attr}' is protected by '{objs[0].__name__}'"
+    for obj in objs:
         assert_set_del_is_protected(obj, attr, regex)
 
 
@@ -72,12 +78,16 @@ def test_behaviour_get_set_delete_unprotected_nonparameter_class_level(
     assert_same_behaviour,
 ):
     """Test vanilla behaviour class level."""
-    # Treat "get slot" separately because the member descriptor is
-    # created at class instanciation and is thus distinct.
-    if ops[0] == "get" and kind.slot:
+    # Treat cases where "get" should return a slot separately, because
+    # the member descriptor is created at class instanciation and is
+    # thusnot the same object between classes.
+    if kind.slot and ops == ["get"]:
         return
-
     assert_same_behaviour(*make("Param, Vanilla", kind), attr=attr, ops=ops)
+
+    if kind.slot and ops == ["delete", "get"]:
+        return
+    assert_same_behaviour(*make("ParamChild, VanillaChild", kind), attr=attr, ops=ops)
 
 
 @parametrize_attr_kind("slot")
@@ -86,13 +96,16 @@ def test_behaviour_get_slot_class_level(attr, kind, make):
 
     Special case, soft check slot member descriptor.
     """
-    Param, Vanilla = make("Param, Vanilla", kind)
-    param_membr = getattr(Param, attr)
-    vanilla_membr = getattr(Vanilla, attr)
+    classes = make("Param, ParamChild, Vanilla, VanillaChild", kind)
+    members = tuple(getattr(cls, attr) for cls in classes)
 
-    assert type(param_membr) is type(vanilla_membr)
-    for membr, cls in zip((param_membr, vanilla_membr), (Param, Vanilla), strict=True):
-        assert repr(membr) == f"<member '{attr}' of '{cls.__name__}' objects>"
+    class ClassWithSlot:
+        __slots__ = ("slot",)
+
+    for cls, member in zip(classes, members, strict=True):
+        assert type(member) is type(ClassWithSlot.slot)
+        owner_name = cls.__name__.replace("Child", "")
+        assert repr(member) == f"<member '{attr}' of '{owner_name}' objects>"
 
 
 @pytest.mark.parametrize("ops", all_ops, ids=" > ".join)
@@ -105,7 +118,7 @@ def test_behaviour_get_set_delete_unprotected_nonparameter_instance_empty(
     assert_same_behaviour,
 ):
     """Test vanilla behaviour."""
-    objs = make("param, vanilla", kind)
+    objs = make("param, paramchild, vanilla, vanillachild", kind)
     assert_same_behaviour(*objs, attr=attr, ops=ops)
 
 
@@ -120,12 +133,28 @@ def test_behaviour_get_set_delete_unprotected_nonparameter_instance_filled(
     assert_same_behaviour,
 ):
     """Test vanilla behaviour."""
-    objs_fill = make("param_fill, vanilla_fill", kind, fill=null)
+    objs_fill = make(
+        "param_fill, paramchild_fill, vanilla_fill, vanillachild_fill",
+        kind,
+        fill=null,
+    )
     assert_same_behaviour(*objs_fill, attr=attr, ops=ops)
 
 
 @parametrize_attr_kind("protected", "nonparameter")
-def test_behaviour_get_protected_nonparameter(
+def test_behaviour_get_protected_nonparameter_class_level(
+    attr,
+    kind,
+    make,
+    assert_same_behaviour,
+):
+    """Test vanilla behaviour except param_fill <-> param."""
+    classes = make("Param, ParamChild, Vanilla, VanillaChild", kind)
+    assert_same_behaviour(*classes, attr=attr, ops="get")
+
+
+@parametrize_attr_kind("protected", "nonparameter")
+def test_behaviour_get_protected_nonparameter_instance_level(
     attr,
     kind,
     make,
@@ -133,17 +162,26 @@ def test_behaviour_get_protected_nonparameter(
     assert_same_behaviour,
 ):
     """Test vanilla behaviour except param_fill <-> param."""
-    Param, param, param_fill, Vanilla, vanilla = make(
-        "Param, param, param_fill, Vanilla, vanilla",
-        kind,
-        fill=null,
-    )
-    assert_same_behaviour(Param, Vanilla, attr=attr, ops="get")
+    targets = [
+        "param",
+        "paramchild",
+        "param_fill",
+        "paramchild_fill",
+        "vanilla",
+        "vanillachild",
+    ]
+    objs = make(", ".join(targets), kind, fill=null)
+    are_filled = [target.endswith("_fill") for target in targets]
 
-    # param_fill: remove from object dict
-    assert attr in vars(param_fill)
-    assert_same_behaviour(param, param_fill, vanilla, attr=attr, ops="get")
-    assert attr not in vars(param_fill)
+    # `param_fill` and `paramchild_fill`: should remove from object dict
+    for obj, is_filled in zip(objs, are_filled, strict=True):
+        if is_filled:
+            assert attr in vars(obj)
+
+    assert_same_behaviour(*objs, attr=attr, ops="get")
+
+    for obj in objs:
+        assert attr not in vars(obj)
 
 
 def test_behaviour_get_special_case_instance_filled_attr_dict(make, null):
@@ -166,45 +204,62 @@ def test_behaviour_get_special_case_instance_filled_attr_dict(make, null):
 @parametrize_attr_kind("parameter", "nonmissing")
 def test_behaviour_get_parameter_nonmissing(attr, kind, make, null):
     """Always bypasses descriptors."""
-    Param, param, param_fill = make("Param, param, param_fill", kind, fill=null)
+    Param, ParamChild, param, paramchild, param_fill, paramchild_fill = make(
+        "Param, ParamChild, param, paramchild, param_fill, paramchild_fill",
+        kind,
+        fill=null,
+    )
     cls_var = vars(Param)[attr]
 
-    # Param, param
-    for obj in (Param, param):
+    # Nonfilled
+    for obj in (Param, ParamChild, param, paramchild):
         assert getattr(obj, attr) is cls_var
 
-    # param_fill: remove from object dict if protected
-    assert vars(param_fill)[attr] is null
-    if kind.protected:
-        assert getattr(param_fill, attr) is cls_var
-        assert attr not in vars(param_fill)
-    else:
-        assert getattr(param_fill, attr) is null
+    # Filled: remove from object dict if protected
+    for obj_fill in (param_fill, paramchild_fill):
+        assert vars(obj_fill)[attr] is null
+        if kind.protected:
+            assert getattr(obj_fill, attr) is cls_var
+            assert attr not in vars(obj_fill)
+        else:
+            assert getattr(obj_fill, attr) is null
 
 
 @parametrize_attr_kind("parameter", "missing")
 def test_behaviour_get_parameter_missing(attr, kind, make, null):
     """Always bypasses descriptors."""
-    Param, param, param_fill = make("Param, param, param_fill", kind, fill=null)
+    Param, ParamChild, param, paramchild, param_fill, paramchild_fill = make(
+        "Param, ParamChild, param, paramchild, param_fill, paramchild_fill",
+        kind,
+        fill=null,
+    )
 
-    # Param
-    regex = f"^type object '{Param.__name__}' has no attribute '{attr}'$"
-    with pytest.raises(AttributeError, match=regex):
-        getattr(Param, attr)
+    # Class
+    for cls in (Param, ParamChild):
+        regex = f"^type object '{cls.__name__}' has no attribute '{attr}'$"
+        with pytest.raises(AttributeError, match=regex):
+            getattr(cls, attr)
 
-    # param
-    regex = f"^'{Param.__name__}' object has no attribute '{attr}'$"
-    with pytest.raises(AttributeError, match=regex):
-        getattr(param, attr)
+    # Empty instance
+    for obj in (param, paramchild):
+        regex = f"^'{type(obj).__name__}' object has no attribute '{attr}'$"
+        with pytest.raises(AttributeError, match=regex):
+            getattr(obj, attr)
 
-    # param_fill
-    assert getattr(param_fill, attr) is null
+    # Filled instance
+    for obj_fill in (param_fill, paramchild_fill):
+        assert getattr(obj_fill, attr) is null
 
 
 @parametrize_attr_kind("unprotected", "parameter")
 def test_behaviour_set_unprotected_parameter(attr, kind, make, null):
     """Always bypasses descriptors."""
-    for obj in make("Param, param, param_fill", kind):
+    objs = make(
+        "Param, ParamChild, param, paramchild, param_fill, paramchild_fill",
+        kind,
+    )
+
+    for obj in objs:
         assert vars(obj).get(attr, None) is not null
         setattr(obj, attr, null)
         assert vars(obj)[attr] is null
@@ -213,15 +268,19 @@ def test_behaviour_set_unprotected_parameter(attr, kind, make, null):
 @parametrize_attr_kind("unprotected", "parameter")
 def test_delete_behaviour_unprotected_parameter_class_level(attr, kind, make):
     """Always bypasses descriptors."""
-    Param = make("Param", kind)
+    for cls in make("Param, ParamChild", kind):
+        if attr in vars(cls):
+            delattr(cls, attr)
+            assert attr not in vars(cls)
+            continue
 
-    # Manually handle special cases
-    if attr not in vars(Param):
-        assert attr == "unprotected_parameter_missing"
-        return
+        old = sys.version_info < (3, 11)
+        prefix = "" if old else f"type object '{cls.__name__}' has no attribute '"
+        suffix = "" if old else "'"
+        regex = f"^{prefix}{attr}{suffix}$"
 
-    delattr(Param, attr)
-    assert attr not in vars(Param)
+        with pytest.raises(AttributeError, match=regex):
+            delattr(cls, attr)
 
 
 @parametrize_attr_kind("unprotected", "parameter")
@@ -230,12 +289,14 @@ def test_delete_behaviour_unprotected_parameter_instance_level(attr, kind, make)
     param, param_fill = make("param, param_fill", kind)
 
     # Empty instance
-    with pytest.raises(AttributeError, match=f"^{attr}$"):
-        delattr(param, attr)
+    for obj in make("param, paramchild", kind):
+        with pytest.raises(AttributeError, match=f"^{attr}$"):
+            delattr(obj, attr)
 
     # Filled instance
-    delattr(param_fill, attr)
-    assert attr not in vars(param_fill)
+    for obj in make("param_fill, paramchild_fill", kind):
+        delattr(obj, attr)
+        assert attr not in vars(obj)
 
 
 # ======================================================================================

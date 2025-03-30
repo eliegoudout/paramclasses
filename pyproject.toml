@@ -1,6 +1,6 @@
 [project]
 name = "paramclasses"
-version = "0.3.1"
+version = "0.3.2dev0"
 description = "Parameter-holding classes with robust subclassing protection"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -18,9 +18,6 @@ dev = [
     "pytest-cov>=6.0.0",
 ]
 
-
-[tool.ruff]
-target-version = "py313"
 
 [tool.ruff.lint]
 select = ["ALL"]
