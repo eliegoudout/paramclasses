@@ -13,6 +13,7 @@ __all__ = [
 from abc import ABCMeta
 from dataclasses import dataclass
 from reprlib import recursive_repr
+import sys
 from types import MappingProxyType
 from typing import NamedTuple, cast, final
 from warnings import warn
@@ -118,6 +119,16 @@ def _repr_owner(*bases: type | None) -> str:
     return ", ".join(sorted(map(_mono_repr, bases)))
 
 
+def _get_namespace_annotations(namespace: dict[str, object]) -> dict[str, object]:
+    if sys.version_info < (3, 14):
+        return cast("dict[str, object]", namespace.get("__annotations__", {}))
+
+    from annotationlib import Format
+
+    ann = namespace.get("__annotate__", None)
+    return {} if ann is None else ann(Format.VALUE)  # Change to FORWARDREF when implemented
+
+
 def _update_while_checking_consistency(orig: dict, update: MappingProxyType) -> None:
     """Update `orig` with `update`, verifying consistent shared keys.
 
@@ -197,7 +208,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
                 protected_new.append(attr)
 
         # Store new parameters and default
-        annotations: dict = cast("dict", namespace.get("__annotations__", {}))
+        annotations = _get_namespace_annotations(namespace)
         for attr in annotations:
             _assert_unprotected(attr, protected)
             _assert_valid_param(attr)
