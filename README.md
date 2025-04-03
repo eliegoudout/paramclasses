@@ -1,5 +1,5 @@
 ![cross platform](https://img.shields.io/badge/cross--platform-%E2%9C%93-blue)
-[![python versions](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)](https://devguide.python.org/versions/)
+[![python versions](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13%20|%203.14-blue)](https://devguide.python.org/versions/)
 [![license MIT](https://img.shields.io/github/license/eliegoudout/paramclasses)](https://opensource.org/licenses/MIT)
 [![pypi](https://img.shields.io/pypi/v/paramclasses)](https://pypi.org/project/paramclasses/)
 [![pipeline status](https://github.com/eliegoudout/paramclasses/actions/workflows/ci.yml/badge.svg)](https://github.com/eliegoudout/paramclasses/actions)

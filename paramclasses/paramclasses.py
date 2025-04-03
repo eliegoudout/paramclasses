@@ -10,13 +10,16 @@ __all__ = [
     "protected",
 ]
 
+import sys
 from abc import ABCMeta
 from dataclasses import dataclass
 from reprlib import recursive_repr
-import sys
 from types import MappingProxyType
-from typing import NamedTuple, cast, final
+from typing import TYPE_CHECKING, NamedTuple, cast, final
 from warnings import warn
+
+if TYPE_CHECKING:  # pragma: no cover
+    from collections.abc import Callable
 
 
 @dataclass(frozen=True)
@@ -119,14 +122,19 @@ def _repr_owner(*bases: type | None) -> str:
     return ", ".join(sorted(map(_mono_repr, bases)))
 
 
-def _get_namespace_annotations(namespace: dict[str, object]) -> dict[str, object]:
+def _get_namespace_annotations(namespace: dict[str, object]) -> dict[str, object]:  # pragma: no cover
+    """Get annotations from a namespace dict, 3.14 compatible."""
+    __annotations__ = cast("dict[str, object]", namespace.get("__annotations__", {}))
+
     if sys.version_info < (3, 14):
-        return cast("dict[str, object]", namespace.get("__annotations__", {}))
+        return __annotations__
 
-    from annotationlib import Format
+    # For python >= 3.14
+    # https://discuss.python.org/t/python-3-14-metaclasses-interact-with-annotations-from-namespace-dict/87010
+    from annotationlib import Format  # type: ignore[import-not-found]
 
-    ann = namespace.get("__annotate__", None)
-    return {} if ann is None else ann(Format.VALUE)  # Change to FORWARDREF when implemented
+    ann = cast("Callable[[int], dict[str, object]]", namespace.get("__annotate__"))
+    return __annotations__ if ann is None else ann(Format.VALUE)  # soon FORWARDREF(?)
 
 
 def _update_while_checking_consistency(orig: dict, update: MappingProxyType) -> None:
