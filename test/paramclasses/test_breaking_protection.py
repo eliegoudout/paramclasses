@@ -104,4 +104,4 @@ def test_use_type_methods_directly(null):
     type.__delattr__(A, "x")
     regex = r"^type object 'A' has no attribute 'x'$"
     with pytest.raises(AttributeError, match=regex):
-        A.x  # noqa: B018, not "useless"
+        A.x  # noqa: B018 (not "useless")

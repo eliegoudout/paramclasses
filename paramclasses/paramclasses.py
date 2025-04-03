@@ -39,7 +39,7 @@ class _ProtectedType:
     val: object
 
     # See github.com/eliegoudout/paramclasses/issues/3
-    def __new__(cls, *_: object, **__: object):  # noqa: ANN204  # No `Self` in 3.10
+    def __new__(cls, *_: object, **__: object):  # noqa: ANN204 (no `Self` in 3.10)
         return super().__new__(cls)
 
 
@@ -122,7 +122,9 @@ def _repr_owner(*bases: type | None) -> str:
     return ", ".join(sorted(map(_mono_repr, bases)))
 
 
-def _get_namespace_annotations(namespace: dict[str, object]) -> dict[str, object]:  # pragma: no cover
+def _get_namespace_annotations(
+    namespace: dict[str, object],
+) -> dict[str, object]:  # pragma: no cover
     """Get annotations from a namespace dict, 3.14 compatible."""
     __annotations__ = cast("dict[str, object]", namespace.get("__annotations__", {}))
 
