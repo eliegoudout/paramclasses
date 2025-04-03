@@ -3,8 +3,24 @@ name = "paramclasses"
 version = "0.3.3dev0"
 description = "Parameter-holding classes with robust subclassing protection"
 readme = "README.md"
+requires-python = ">=3.10, <3.15"
+authors = [{name = "Élie Goudout", email = "eliegoudout@hotmail.com"}]
 license = {file = "LICENSE"}
-requires-python = ">=3.10, <3.14"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Pytest",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
 dependencies = []
 
 [project.urls]

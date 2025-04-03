@@ -10,12 +10,16 @@ __all__ = [
     "protected",
 ]
 
+import sys
 from abc import ABCMeta
 from dataclasses import dataclass
 from reprlib import recursive_repr
 from types import MappingProxyType
-from typing import NamedTuple, cast, final
+from typing import TYPE_CHECKING, NamedTuple, cast, final
 from warnings import warn
+
+if TYPE_CHECKING:  # pragma: no cover
+    from collections.abc import Callable
 
 
 @dataclass(frozen=True)
@@ -35,7 +39,7 @@ class _ProtectedType:
     val: object
 
     # See github.com/eliegoudout/paramclasses/issues/3
-    def __new__(cls, *_: object, **__: object):  # noqa: ANN204  # No `Self` in 3.10
+    def __new__(cls, *_: object, **__: object):  # noqa: ANN204 (no `Self` in 3.10)
         return super().__new__(cls)
 
 
@@ -118,6 +122,23 @@ def _repr_owner(*bases: type | None) -> str:
     return ", ".join(sorted(map(_mono_repr, bases)))
 
 
+def _get_namespace_annotations(
+    namespace: dict[str, object],
+) -> dict[str, object]:  # pragma: no cover
+    """Get annotations from a namespace dict, 3.14 compatible."""
+    __annotations__ = cast("dict[str, object]", namespace.get("__annotations__", {}))
+
+    if sys.version_info < (3, 14):
+        return __annotations__
+
+    # For python >= 3.14
+    # https://discuss.python.org/t/python-3-14-metaclasses-interact-with-annotations-from-namespace-dict/87010
+    from annotationlib import Format  # type: ignore[import-not-found]
+
+    ann = cast("Callable[[int], dict[str, object]]", namespace.get("__annotate__"))
+    return __annotations__ if ann is None else ann(Format.VALUE)  # soon FORWARDREF(?)
+
+
 def _update_while_checking_consistency(orig: dict, update: MappingProxyType) -> None:
     """Update `orig` with `update`, verifying consistent shared keys.
 
@@ -197,7 +218,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
                 protected_new.append(attr)
 
         # Store new parameters and default
-        annotations: dict = cast("dict", namespace.get("__annotations__", {}))
+        annotations = _get_namespace_annotations(namespace)
         for attr in annotations:
             _assert_unprotected(attr, protected)
             _assert_valid_param(attr)
