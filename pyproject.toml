@@ -1,6 +1,6 @@
 [project]
 name = "paramclasses"
-version = "0.3.3"
+version = "0.3.4a1"
 description = "Parameter-holding classes with robust subclassing protection"
 readme = "README.md"
 requires-python = ">=3.10, <3.15"
