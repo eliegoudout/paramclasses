@@ -19,16 +19,26 @@ def test_slot_compatible(null):
     assert "x" not in vars(a)
 
 
-def test_repr_with_missing_and_recursion(make):
-    """Show nondefault and missing parameters, handle recursive repr."""
+def test_repr_str_with_missing_and_recursion(make):
+    """Test `repr` and `str`, both with recursion."""
     param = make("param", *kinds("nondescriptor"))
     param.unprotected_parameter_with_nondescriptor = param
-    expected = (
+    runtime_repr = type(param).protected_parameter_with_nondescriptor
+
+    expected_repr = (
         "ParamTest"
         "(unprotected_parameter_missing=?,"
-        " unprotected_parameter_with_nondescriptor=...)"
+        " unprotected_parameter_with_nondescriptor=..., "
+        f"protected_parameter_with_nondescriptor={runtime_repr})"
     )
-    assert repr(param) == expected
+    expected_str = (
+        "ParamTest"
+        "(unprotected_parameter_missing=?, "
+        f"unprotected_parameter_with_nondescriptor={expected_repr})"
+    )
+
+    assert repr(param) == expected_repr
+    assert str(param) == expected_str
 
 
 def test_missing_params_property(make):

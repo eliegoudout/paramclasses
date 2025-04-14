@@ -85,10 +85,10 @@ class A(ParamClass):
 
 ```
 
-Instances have a `repr` -- which can be overriden in subclasses -- displaying **non-default or missing** parameter values.
+Instances have natural `__str__` and `__repr__` methods -- which can be overriden in subclasses --, the former displaying only **nondefault or missing** parameter values.
 ```pycon
->>> A(parameter_with_a__default_value="non-default value")
-A(parameter_with_a__default_value='non-default value', parameter_with_no_default_value=?)
+>>> print(A(parameter_with_a__default_value="nondefault value"))  # Calls `__str__`
+A(parameter_with_a__default_value='nondefault value', parameter_with_no_default_value=?)
 ```
 
 One accesses current parameters dict and missing parameters of an instance with the properties `params` and `missing_params` respectively.
@@ -141,12 +141,12 @@ class A(ParamClass):
 ```
 ```pycon
 >>> a = A(y=1); a.t = 1; a    # Instantiation assignments
-A(x=?, y=1)                   # Only shows missing and non-default parameters
+A(x=?, y=1, z=0)              # Shows every parameter with "?" for missing values
 >>> A().set_params(x=2, y=2)  # `set_params` assignments
 >>> A().y = 1                 # Usual assignment
 >>> del A(x=0).x              # Usual deletion
 >>> A.y = 1                   # Class-level assignment/deletion works...
->>> A()
+>>> print(A())
 A(x=?, y=1)                   # ... and `A` remembers default values -- otherwise would show `A(x=?)`
 >>> a.set_params(t=0)         # Should FAIL: Non-parameters cannot be assigned with `set_params`
 <traceback>
@@ -263,7 +263,11 @@ def __post_init__(self, *args: object, **kwargs: object) -> None:
     """Init logic, after parameters assignment."""
 
 def __repr__(self) -> str:
-    """Show all non-default or missing, e.g. `A(x=1, z=?)`."""
+    """Show all params, e.g. `A(x=1, z=?)`."""
+
+def __str__(self) -> str:
+    """Show all nondefault or missing, e.g. `A(z=?)`."""
+
 
 ```
 

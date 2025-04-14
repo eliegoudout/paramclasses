@@ -299,7 +299,16 @@ class RawParamClass(metaclass=_MetaParamClass):
 
     @recursive_repr()
     def __repr__(self) -> str:
-        """Show all non-default or missing, e.g. `A(x=1, z=?)`."""
+        """Show all params, e.g. `A(x=1, z=?)`."""
+        params_str = ", ".join(
+            f"{attr}={getattr(self, attr, MISSING)!r}"
+            for attr in getattr(self, IMPL).default
+        )
+        return f"{type(self).__name__}({params_str})"
+
+    @recursive_repr()
+    def __str__(self) -> str:
+        """Show all nondefault or missing, e.g. `A(z=?)`."""
         params_str = ", ".join(
             f"{attr}={getattr(self, attr, MISSING)!r}"
             for attr, val_default in getattr(self, IMPL).default.items()
@@ -441,7 +450,8 @@ class ParamClass(RawParamClass):
     Unprotected methods:
         _on_param_will_be_set: Call before parameter assignment.
         __post_init__: Init logic, after parameters assignment.
-        __repr__: Show all non-default or missing, e.g. `A(x=1, y=?)`.
+        __repr__: Show all params, e.g. `A(z=?)`.
+        __str__: Show all nondefault or missing, e.g. `A(x=1, z=?)`.
 
     Protected methods:
         set_params: Set multiple parameter values at once via keywords.
