@@ -288,8 +288,8 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         return ABCMeta.__delattr__(cls, attr)
 
     @property
-    def __signature__(cls) -> str:
-        return Signature(
+    def __signature__(cls) -> Signature:
+        parameters = tuple(
             Parameter(
                 param,
                 Parameter.KEYWORD_ONLY,
@@ -298,6 +298,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
             )
             for param, annotation in getattr(cls, IMPL).annotations.items()
         )
+        return Signature(parameters)
 
 
 class RawParamClass(metaclass=_MetaParamClass):

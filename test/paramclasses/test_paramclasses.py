@@ -157,9 +157,9 @@ def test_signature():
     """Test `__signature__` property."""
 
     class A(ParamClass):
-        x: float
-        y: int = 0
-        z: str = 0
+        x: float  # type:ignore[annotation-unchecked]
+        y: int = 0  # type:ignore[annotation-unchecked]
+        z: str = 0  # type:ignore[annotation-unchecked]
         t = 0
 
     expected = "<Signature (*, x: float = ?, y: int = 0, z: str = 0)>"
@@ -170,7 +170,7 @@ def test_default_update():
     """Check that default is current runtime class value."""
 
     class A(ParamClass):
-        x: int = 0
+        x: int = 0  # type:ignore[annotation-unchecked]
 
     a = A(x=1)
 
