@@ -71,7 +71,7 @@ Note that the protection provided by _paramclasses_ is very robust for **practic
 
 ### Defining a _paramclass_
 
-A _paramclass_ is simply defined by subclassing `ParamClass` directly or another _paramclass_. Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), **parameters** are identified as **any annotated attribute** and instancation logic is automatically built-in -- though it can be [extended](#instantiation-logic-with-__post_init__).
+A _paramclass_ is simply defined by subclassing `ParamClass` directly or another _paramclass_. Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), **parameters** are identified as **any annotated attribute** and instanciation logic is automatically built-in -- though it can be [extended](#instantiation-logic-with-__post_init__). In our context, "default" means the current class value, which may change after the instanciation of an object.
 ```python
 from paramclasses import ParamClass
 
@@ -146,8 +146,8 @@ A(x=?, y=1, z=0)              # Shows every parameter with "?" for missing value
 >>> A().y = 1                 # Usual assignment
 >>> del A(x=0).x              # Usual deletion
 >>> A.y = 1                   # Class-level assignment/deletion works...
->>> print(A())
-A(x=?, y=1)                   # ... and `A` remembers default values -- otherwise would show `A(x=?)`
+>>> print(a)
+A(x=?)                        # ... and default value gets updated -- otherwise would show `A(x=?, y=1)`
 >>> a.set_params(t=0)         # Should FAIL: Non-parameters cannot be assigned with `set_params`
 <traceback>
 AttributeError: Invalid parameters: {'t'}. Operation cancelled
@@ -273,14 +273,14 @@ def __str__(self) -> str:
 
 Furthermore, _as a last resort_, developers may occasionally wish to use the following module attributes.
 
-- `IMPL`: Current value is `"__paramclass_impl_"`. Use `getattr(paramclass or instance, IMPL)` to get a `NamedTuple` instance with `default` and `protected` fields. Both are mapping proxies of, respectively, `(param, default value)` and `(protected attribute, owner)` pairs. The string `IMPL` acts as special protected key for _paramclasses_' namespaces, to leave `default` and `protected` available to users. We purposefully chose a _would-be-mangled_ name to further decrease the odds of natural conflict.
-- `MISSING`: The object representing the "missing value" in the default values of parameters. Using `instance.missing_params` should almost always be enough, but if necessary, use `val is MISSING` to check for missing values.
+- `IMPL`: Current value is `"__paramclass_impl_"`. Use `getattr(paramclass or instance, IMPL)` to get a `NamedTuple` instance with `annotations` and `protected` fields. Both are mapping proxies of, respectively, `(param, annotation)` and `(protected attribute, owner)` pairs. Note that the annotations are fixed at class creation and **never updated**. The string `IMPL` acts as special protected key for _paramclasses_' namespaces, to leave `annotations` and `protected` available to users. We purposefully chose a _would-be-mangled_ name to further decrease the odds of natural conflict.
+- `MISSING`: The object representing the "missing value", used for string representations and checking parameter values.
 
 ```python
 # Recommended way of using `IMPL`
 from paramclasses import IMPL, ParamClass
 
-getattr(ParamClass, IMPL).default    # mappingproxy({})
+getattr(ParamClass, IMPL).annotations    # mappingproxy({})
 getattr(ParamClass, IMPL).protected  # mappingproxy({'__paramclass_impl_': None, '__dict__': None, '__init__': <class 'paramclasses.paramclasses.RawParamClass'>, '__getattribute__': <class 'paramclasses.paramclasses.RawParamClass'>, '__setattr__': <class 'paramclasses.paramclasses.RawParamClass'>, '__delattr__': <class 'paramclasses.paramclasses.RawParamClass'>, 'set_params': <class 'paramclasses.paramclasses.ParamClass'>, 'params': <class 'paramclasses.paramclasses.ParamClass'>, 'missing_params': <class 'paramclasses.paramclasses.ParamClass'>})
 # Works on subclasses and instances too
 ```
@@ -397,8 +397,8 @@ ProtectedError: 'x' protection conflict: 'A', 'B'
 It is possible to inherit from a mix of _paramclasses_ and non-_paramclasses_, with the two following limitations.
 
 1. Because `type(ParamClass)` is a subclass of `ABCMeta`, non-_paramclass_ bases must be either vanilla classes or abstract classes.
-
 2. Behaviour is not guaranteed for non-_paramclass_ bases with an `IMPL`-named attribute -- _see [Subclassing API](#3-subclassing-api-)_.
+3. Until [#28](https://github.com/eliegoudout/paramclasses/issues/28) is fixed, one should manually ensure that MRO does not prioritize any non-paramclass before all paramclasses.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 

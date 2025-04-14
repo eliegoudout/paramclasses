@@ -13,6 +13,7 @@ __all__ = [
 import sys
 from abc import ABCMeta
 from dataclasses import dataclass
+from inspect import Parameter, Signature
 from reprlib import recursive_repr
 from types import MappingProxyType
 from typing import NamedTuple, cast, final
@@ -168,8 +169,8 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     """Specifically implemented as `RawParamClass`'s metaclass.
 
     Implements class-level protection behaviour and parameters
-    identification, with default values. Also subclasses `ABCMeta` to
-    be compatible with its functionality.
+    identification, with annotations. Also subclasses `ABCMeta` to be
+    compatible with its functionality.
     """
 
     def __new__(mcs, name: str, bases: tuple, namespace: dict[str, object]) -> type:
@@ -177,24 +178,24 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
         It essentially does the following.
             1. Retrieves parameters and protected attributes from bases.
-            2. Inspects `namespace` and its `__annotations__` to infer
-                new parameters and newly protected attributes.
-            3. Store those in `IMPL` class attribute.
+            2. Inspects `namespace` and its annotations to infer new
+               parameters and newly protected attributes.
+            3. Stores those in `IMPL` class attribute.
         """
 
         class Impl(NamedTuple):
             """Details held for paramclass machinery."""
 
-            default: MappingProxyType = MappingProxyType({})
+            annotations: MappingProxyType = MappingProxyType({})
             protected: MappingProxyType = MappingProxyType({})
 
-        # # Bases: default, protected
-        default: dict = {}
+        # # Bases: annotations, protected
+        annotations: dict = {}
         protected_special = [IMPL, "__dict__"]
         protected = dict.fromkeys(protected_special)
         for base in bases[::-1]:
-            default_base, protected_base = getattr(base, IMPL, Impl())
-            default |= default_base
+            annotations_base, protected_base = getattr(base, IMPL, Impl())
+            annotations |= annotations_base
             # Previous bases protected coherence
             _update_while_checking_consistency(protected, protected_base)
             for attr in vars(base):
@@ -227,15 +228,16 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
             if was_protected:
                 protected_new.append(attr)
 
-        # Store new parameters and default
-        annotations = _get_namespace_annotations(namespace)
-        for attr in annotations:
+        # Store new parameters and annotations
+        new_annotations = _get_namespace_annotations(namespace)
+        for attr in new_annotations:
             _assert_unprotected(attr, protected)
             _assert_valid_param(attr)
-            default[attr] = namespace_final.get(attr, MISSING)
+
+        annotations |= new_annotations
 
         # Update namespace
-        namespace_final[IMPL] = Impl(*map(MappingProxyType, [default, protected]))
+        namespace_final[IMPL] = Impl(*map(MappingProxyType, [annotations, protected]))
         cls = ABCMeta.__new__(mcs, name, bases, namespace_final)
 
         # Declare `cls` as owner for newly protected attributes
@@ -253,7 +255,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
             return vars_cls
 
         # Not a parameter, normal look-up
-        if attr not in vars_cls[IMPL].default:
+        if attr not in vars_cls[IMPL].annotations:
             return ABCMeta.__getattribute__(cls, attr)
 
         # Parameters bypass descriptor
@@ -285,6 +287,18 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         _assert_unprotected(attr, getattr(cls, IMPL).protected)
         return ABCMeta.__delattr__(cls, attr)
 
+    @property
+    def __signature__(cls) -> str:
+        return Signature(
+            Parameter(
+                param,
+                Parameter.KEYWORD_ONLY,
+                default=getattr(cls, param, MISSING),
+                annotation=annotation,
+            )
+            for param, annotation in getattr(cls, IMPL).annotations.items()
+        )
+
 
 class RawParamClass(metaclass=_MetaParamClass):
     """`ParamClass` without `set_params`, `params`, `missing_params`."""
@@ -302,17 +316,18 @@ class RawParamClass(metaclass=_MetaParamClass):
         """Show all params, e.g. `A(x=1, z=?)`."""
         params_str = ", ".join(
             f"{attr}={getattr(self, attr, MISSING)!r}"
-            for attr in getattr(self, IMPL).default
+            for attr in getattr(self, IMPL).annotations
         )
         return f"{type(self).__name__}({params_str})"
 
     @recursive_repr()
     def __str__(self) -> str:
         """Show all nondefault or missing, e.g. `A(z=?)`."""
+        null = object()
         params_str = ", ".join(
             f"{attr}={getattr(self, attr, MISSING)!r}"
-            for attr, val_default in getattr(self, IMPL).default.items()
-            if (val_default is MISSING) or (getattr(self, attr, MISSING) != val_default)
+            for attr in getattr(self, IMPL).annotations
+            if getattr(self, attr, MISSING) != getattr(type(self), attr, null)
         )
         return f"{type(self).__name__}({params_str})"
 
@@ -338,7 +353,7 @@ class RawParamClass(metaclass=_MetaParamClass):
 
         """
         # Set params: KEEP UP-TO-DATE with `ParamClass.set_params`!
-        wrong = set(param_values) - set(getattr(self, IMPL).default)
+        wrong = set(param_values) - set(getattr(self, IMPL).annotations)
         if wrong:
             msg = f"Invalid parameters: {wrong}. Operation cancelled"
             raise AttributeError(msg)
@@ -370,7 +385,7 @@ class RawParamClass(metaclass=_MetaParamClass):
             del vars_self[attr]
 
         # Not a parameter, normal look-up
-        if attr not in getattr(cls, IMPL).default:
+        if attr not in getattr(cls, IMPL).annotations:
             return object.__getattribute__(self, attr)
 
         # Parameters bypass descriptor
@@ -404,7 +419,7 @@ class RawParamClass(metaclass=_MetaParamClass):
             )
 
         # Handle callback, descriptor parameters
-        if attr in getattr(self, IMPL).default:
+        if attr in getattr(self, IMPL).annotations:
             self._on_param_will_be_set(attr, val)
             vars(self)[attr] = val
         else:
@@ -417,7 +432,7 @@ class RawParamClass(metaclass=_MetaParamClass):
         _assert_unprotected(attr, getattr(self, IMPL).protected)
 
         # Handle descriptor parameters
-        if attr in getattr(self, IMPL).default:
+        if attr in getattr(self, IMPL).annotations:
             if attr not in (vars_self := vars(self)):
                 raise AttributeError(attr)
             del vars_self[attr]
@@ -471,7 +486,7 @@ class ParamClass(RawParamClass):
     # KEEP UP-TO-DATE with first part of `RawParamClass.__init__`!
     def set_params(self, **param_values: object) -> None:
         """Set multiple parameter values at once via keywords."""
-        wrong = set(param_values) - set(getattr(self, IMPL).default)
+        wrong = set(param_values) - set(getattr(self, IMPL).annotations)
         if wrong:
             msg = f"Invalid parameters: {wrong}. Operation cancelled"
             raise AttributeError(msg)
@@ -484,7 +499,8 @@ class ParamClass(RawParamClass):
     def params(self) -> dict[str, object]:
         """Copy of the current parameter dict for instance."""
         return {
-            attr: getattr(self, attr, MISSING) for attr in getattr(self, IMPL).default
+            attr: getattr(self, attr, MISSING)
+            for attr in getattr(self, IMPL).annotations
         }
 
     @protected  # type: ignore[prop-decorator]  # mypy is fooled
@@ -493,7 +509,7 @@ class ParamClass(RawParamClass):
         """Parameters without value."""
         return tuple(
             attr
-            for attr in getattr(self, IMPL).default
+            for attr in getattr(self, IMPL).annotations
             if not hasattr(self, attr) or getattr(self, attr) is MISSING
         )
 
