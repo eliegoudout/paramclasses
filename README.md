@@ -230,6 +230,8 @@ def __init__(self, args: list[object] = [], kwargs: dict[str, object] = {}, /, *
 
 Since parameter values are set before `__post_init__` is called, they are accessible when it executes. Note that even if a _paramclass_ does not define `__post_init__`, its bases might, in which case it is used.
 
+Additionally, both `@staticmethod` and `@classmethod` decorators are supported decorators for `__post_init__` declaration. In other cases, the `__signature__` property may fail.
+
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
 #### Abstract methods
