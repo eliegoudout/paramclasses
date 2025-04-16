@@ -177,3 +177,32 @@ def test_default_update():
     assert str(a) == "A(x=1)"
     A.x = 1
     assert str(a) == "A()"
+
+
+def test_post_init():
+    """Test trivial `__post_init__` use."""
+
+    class A(ParamClass):
+        def __post_init__(self, arg1, arg2) -> None:
+            self.arg1 = arg1
+            self.arg2 = arg2
+
+    arg1, arg2 = object(), object()
+
+    for a in (
+        A([arg1, arg2]),
+        A([arg1], {"arg2": arg2}),
+        A([], {"arg1": arg1, "arg2": arg2}),
+        A(None, {"arg1": arg1, "arg2": arg2}),
+    ):
+        assert a.arg1 is arg1
+        assert a.arg2 is arg2
+
+
+def test_unexpected_post_init_arguments(make):
+    """Check that provided arguments raise error when no post-init."""
+    Param = make("Param")
+
+    regex = r"^Unexpected positional arguments \(no `__post_init__` is defined\)$"
+    with pytest.raises(TypeError, match=regex):
+        Param(1)

@@ -222,13 +222,13 @@ and is called as follows by `__init__`.
 ```python
 # Close equivalent to actual implementation
 @protected
-def __init__(self, args: list = [], kwargs: dict = {}, /, **param_values: object) -> None:
+def __init__(self, args: list[object] = [], kwargs: dict[str, object] = {}, /, **param_values: object) -> None:
         self.set_params(**param_values)
         self.__post_init__(*args, **kwargs)
 
 ```
 
-Since parameter values are set before `__post_init__` is called, they are accessible when it executes.
+Since parameter values are set before `__post_init__` is called, they are accessible when it executes. Note that even if a _paramclass_ does not define `__post_init__`, its bases might, in which case it is used.
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
@@ -253,14 +253,11 @@ TypeError: Can't instantiate abstract class A with abstract method next
 
 ## 3. Subclassing API 👩‍💻
 
-As seen in [Additional functionalities](#additional-functionalities), three methods may be overriden by subclasses.
+As seen in [Additional functionalities](#additional-functionalities), three methods may be implemented by subclasses.
 ```python
 # ===================== Subclasses may override these ======================
 def _on_param_will_be_set(self, attr: str, future_val: object) -> None:
     """Call before parameter assignment."""
-
-def __post_init__(self, *args: object, **kwargs: object) -> None:
-    """Init logic, after parameters assignment."""
 
 def __repr__(self) -> str:
     """Show all params, e.g. `A(x=1, z=?)`."""
@@ -268,6 +265,9 @@ def __repr__(self) -> str:
 def __str__(self) -> str:
     """Show all nondefault or missing, e.g. `A(z=?)`."""
 
+# ===================== Subclasses may introduce these =====================
+def __post_init__(self, *args: object, **kwargs: object) -> None:
+    """Init logic, after parameters assignment."""
 
 ```
 
@@ -280,8 +280,8 @@ Furthermore, _as a last resort_, developers may occasionally wish to use the fol
 # Recommended way of using `IMPL`
 from paramclasses import IMPL, ParamClass
 
-getattr(ParamClass, IMPL).annotations    # mappingproxy({})
-getattr(ParamClass, IMPL).protected  # mappingproxy({'__paramclass_impl_': None, '__dict__': None, '__init__': <class 'paramclasses.paramclasses.RawParamClass'>, '__getattribute__': <class 'paramclasses.paramclasses.RawParamClass'>, '__setattr__': <class 'paramclasses.paramclasses.RawParamClass'>, '__delattr__': <class 'paramclasses.paramclasses.RawParamClass'>, 'set_params': <class 'paramclasses.paramclasses.ParamClass'>, 'params': <class 'paramclasses.paramclasses.ParamClass'>, 'missing_params': <class 'paramclasses.paramclasses.ParamClass'>})
+getattr(ParamClass, IMPL).annotations  # mappingproxy({})
+getattr(ParamClass, IMPL).protected    # mappingproxy({'__paramclass_impl_': None, '__dict__': None, '__init__': <class 'paramclasses.paramclasses.RawParamClass'>, '__getattribute__': <class 'paramclasses.paramclasses.RawParamClass'>, '__setattr__': <class 'paramclasses.paramclasses.RawParamClass'>, '__delattr__': <class 'paramclasses.paramclasses.RawParamClass'>, 'set_params': <class 'paramclasses.paramclasses.ParamClass'>, 'params': <class 'paramclasses.paramclasses.ParamClass'>, 'missing_params': <class 'paramclasses.paramclasses.ParamClass'>})
 # Works on subclasses and instances too
 ```
 

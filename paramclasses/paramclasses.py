@@ -309,9 +309,6 @@ class RawParamClass(metaclass=_MetaParamClass):
     def _on_param_will_be_set(self, attr: str, future_val: object) -> None:
         """Call before parameter assignment."""
 
-    def __post_init__(self, *args: object, **kwargs: object) -> None:
-        """Init logic, after parameters assignment."""
-
     @recursive_repr()
     def __repr__(self) -> str:
         """Show all params, e.g. `A(x=1, z=?)`."""
@@ -337,22 +334,30 @@ class RawParamClass(metaclass=_MetaParamClass):
     @protected  # type: ignore[misc]  # mypy is fooled
     def __init__(
         self,
-        args: list | None = None,
-        kwargs: dict | None = None,
+        args: list[object] | None = None,
+        kwargs: dict[str, object] | None = None,
         /,
         **param_values: object,
     ) -> None:
-        """Set parameters and call `__post_init__`.
+        """Set parameters and call `__post_init__` if defined.
 
         Arguments:
-            args (list | None): If not `None`, unpacked as positional
-                arguments for `__post_init__`.
-            kwargs (dict | None): If not `None`, unpacked as keyword
-                arguments for `__post_init__`.
+            args (list[object] | None): If not `None`, unpacked as
+                positional arguments for `__post_init__` -- if not
+                defined, raises `TypeError`.
+            kwargs (dict[str, object] | None): If not `None`, unpacked
+                as keyword arguments for `__post_init__` -- if not
+                defined, raises `TypeError`.
             **param_values (object): Assigned parameter values at
                 instantiation.
 
         """
+        if not hasattr(self, "__post_init__") and (
+            args is not None or kwargs is not None
+        ):
+            msg = "Unexpected positional arguments (no `__post_init__` is defined)"
+            raise TypeError(msg)
+
         # Set params: KEEP UP-TO-DATE with `ParamClass.set_params`!
         wrong = set(param_values) - set(getattr(self, IMPL).annotations)
         if wrong:
@@ -363,11 +368,14 @@ class RawParamClass(metaclass=_MetaParamClass):
             setattr(self, attr, val)
 
         # Call `__post_init__`
+        if not hasattr(self, "__post_init__"):
+            return
+
         if args is None:
             args = []
         if kwargs is None:
             kwargs = {}
-        self.__post_init__(*args, **kwargs)
+        self.__post_init__(*args, **kwargs)  # type: ignore[operator]  # github.com/eliegoudout/paramclasses/issues/34
 
     @protected
     def __getattribute__(self, attr: str) -> object:  # type: ignore[override]  # mypy is fooled
@@ -465,13 +473,12 @@ class ParamClass(RawParamClass):
 
     Unprotected methods:
         _on_param_will_be_set: Call before parameter assignment.
-        __post_init__: Init logic, after parameters assignment.
         __repr__: Show all params, e.g. `A(z=?)`.
         __str__: Show all nondefault or missing, e.g. `A(x=1, z=?)`.
 
     Protected methods:
         set_params: Set multiple parameter values at once via keywords.
-        __init__: Set parameters and call `__post_init__`.
+        __init__: Set parameters and call `__post_init__` if defined.
         __getattribute__: Handle descriptor parameters.
         __setattr__: Handle protection, missing value, descriptor
             parameters.
