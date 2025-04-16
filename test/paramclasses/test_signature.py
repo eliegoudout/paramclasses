@@ -114,6 +114,31 @@ def test_signature_post_init_kw_only():
         assert signature(cls).format() == expected
 
 
+def test_signature_post_init_argless():
+    """Test `__signature__` property with `__post_init__`.
+
+    Test classical method, staticmethod and classmethod.
+    """
+
+    class A(ParamClass):
+        def __post_init__(self) -> None:
+            """Test with standard method."""
+
+    class B(ParamClass):
+        @classmethod
+        def __post_init__(cls) -> None:
+            """Test with classmethod."""
+
+    class C(ParamClass):
+        @staticmethod
+        def __post_init__() -> None:
+            """Test with staticmethod."""
+
+    expected = "()"
+    for cls in [A, B, C]:
+        assert signature(cls).format() == expected
+
+
 def test_post_init_must_be_callable():
     """Test `__signature__` error when `__post_init__` not callable."""
 

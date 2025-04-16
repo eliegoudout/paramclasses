@@ -19,7 +19,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, NamedTuple, cast, final
 from warnings import warn
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from collections.abc import Callable
 
 
