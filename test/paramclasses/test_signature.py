@@ -1,4 +1,7 @@
-"""Test the `__signature__` property."""
+"""Test the `__signature__` property.
+
+When dropping 3.12, replace `repr(Signature)` with `Signature.format()`.
+"""
 
 from inspect import signature
 
@@ -17,7 +20,7 @@ def test_signature_no_post_init():
         t = 0
 
     expected = "(*, x: float = ?, y: int = 0, z: str = 0)"
-    assert signature(A).format() == expected
+    assert repr(signature(A)) == f"<Signature {expected}>"
 
 
 def test_signature_with_post_init():
@@ -36,7 +39,7 @@ def test_signature_with_post_init():
         "(post_init_args=[], post_init_kwargs={}, /, "
         "*, x: float = ?, y: int = 0, z: str = 0)"
     )
-    assert signature(A).format() == expected
+    assert repr(signature(A)) == f"<Signature {expected}>"
 
 
 def test_signature_post_init_pos_and_kw():
@@ -61,7 +64,7 @@ def test_signature_post_init_pos_and_kw():
 
     expected = "(post_init_args=[], post_init_kwargs={}, /)"
     for cls in [A, B, C]:
-        assert signature(cls).format() == expected
+        assert repr(signature(cls)) == f"<Signature {expected}>"
 
 
 def test_signature_post_init_pos_only():
@@ -86,7 +89,7 @@ def test_signature_post_init_pos_only():
 
     expected = "(post_init_args=[], /)"
     for cls in [A, B, C]:
-        assert signature(cls).format() == expected
+        assert repr(signature(cls)) == f"<Signature {expected}>"
 
 
 def test_signature_post_init_kw_only():
@@ -111,7 +114,7 @@ def test_signature_post_init_kw_only():
 
     expected = "(post_init_kwargs={}, /)"
     for cls in [A, B, C]:
-        assert signature(cls).format() == expected
+        assert repr(signature(cls)) == f"<Signature {expected}>"
 
 
 def test_signature_post_init_argless():
@@ -136,7 +139,7 @@ def test_signature_post_init_argless():
 
     expected = "()"
     for cls in [A, B, C]:
-        assert signature(cls).format() == expected
+        assert repr(signature(cls)) == f"<Signature {expected}>"
 
 
 def test_post_init_must_be_callable():
