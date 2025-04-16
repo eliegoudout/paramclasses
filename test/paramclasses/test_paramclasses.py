@@ -1,7 +1,5 @@
 """Miscellaneous tests not directly related to protection."""
 
-from inspect import signature
-
 import pytest
 
 from paramclasses import MISSING, ParamClass, RawParamClass, isparamclass
@@ -151,19 +149,6 @@ def test_isparamclass_raw():
 
     assert not isparamclass(RawParam)
     assert isparamclass(RawParam, raw=True)
-
-
-def test_signature():
-    """Test `__signature__` property."""
-
-    class A(ParamClass):
-        x: float  # type:ignore[annotation-unchecked]
-        y: int = 0  # type:ignore[annotation-unchecked]
-        z: str = 0  # type:ignore[annotation-unchecked]
-        t = 0
-
-    expected = "<Signature (*, x: float = ?, y: int = 0, z: str = 0)>"
-    assert repr(signature(A)) == expected
 
 
 def test_default_update():

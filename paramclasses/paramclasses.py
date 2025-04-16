@@ -13,11 +13,14 @@ __all__ = [
 import sys
 from abc import ABCMeta
 from dataclasses import dataclass
-from inspect import Parameter, Signature
+from inspect import Parameter, Signature, getattr_static, signature
 from reprlib import recursive_repr
 from types import MappingProxyType
-from typing import NamedTuple, cast, final
+from typing import TYPE_CHECKING, NamedTuple, cast, final
 from warnings import warn
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 @dataclass(frozen=True)
@@ -289,6 +292,48 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
     @property
     def __signature__(cls) -> Signature:
+        # Include `__post_init__` signature, if defined. Specifically,
+        # adds a positional-only `post_init_args` (resp.
+        # `post_init_kwargs`) if `__post_init__` accepts any positional
+        # (resp. keyword) argument. Handles @staticmethod and
+        # @classmethod.
+        post_init = []
+        cls_attr = getattr_static(cls, "__post_init__", None)
+        if cls_attr is None:
+            post_init_parameters = []
+        else:
+            __post_init__ = cast("Callable", cls.__post_init__)
+            if not callable(__post_init__):
+                msg = "'__post_init__' attribute must be callable"
+                raise TypeError(msg)
+
+            post_init_raw_signature = signature(__post_init__)
+            post_init_parameters = list(post_init_raw_signature.parameters.values())
+            if not isinstance(cls_attr, (classmethod, staticmethod)):
+                post_init_parameters.pop(0)
+
+        kinds = {parameter.kind for parameter in post_init_parameters}
+        # If `__post_init__` accepts positional arguments
+        if kinds & {
+            Parameter.POSITIONAL_OR_KEYWORD,
+            Parameter.POSITIONAL_ONLY,
+            Parameter.VAR_POSITIONAL,
+        }:
+            post_init.append(
+                Parameter("post_init_args", Parameter.POSITIONAL_ONLY, default=[]),
+            )
+
+        # If `__post_init__` accepts keyword arguments
+        if kinds & {
+            Parameter.POSITIONAL_OR_KEYWORD,
+            Parameter.KEYWORD_ONLY,
+            Parameter.VAR_KEYWORD,
+        }:
+            post_init.append(
+                Parameter("post_init_kwargs", Parameter.POSITIONAL_ONLY, default={}),
+            )
+
+        # Retrieve params signature
         parameters = tuple(
             Parameter(
                 param,
@@ -298,7 +343,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
             )
             for param, annotation in getattr(cls, IMPL).annotations.items()
         )
-        return Signature(parameters)
+        return Signature([*post_init, *parameters])
 
 
 class RawParamClass(metaclass=_MetaParamClass):
