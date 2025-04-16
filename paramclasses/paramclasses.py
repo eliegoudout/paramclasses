@@ -13,11 +13,14 @@ __all__ = [
 import sys
 from abc import ABCMeta
 from dataclasses import dataclass
-from inspect import Parameter, Signature
+from inspect import Parameter, Signature, getattr_static, signature
 from reprlib import recursive_repr
 from types import MappingProxyType
-from typing import NamedTuple, cast, final
+from typing import TYPE_CHECKING, NamedTuple, cast, final
 from warnings import warn
+
+if TYPE_CHECKING:  # pragma: no cover
+    from collections.abc import Callable
 
 
 @dataclass(frozen=True)
@@ -289,6 +292,48 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
     @property
     def __signature__(cls) -> Signature:
+        # Include `__post_init__` signature, if defined. Specifically,
+        # adds a positional-only `post_init_args` (resp.
+        # `post_init_kwargs`) if `__post_init__` accepts any positional
+        # (resp. keyword) argument. Handles @staticmethod and
+        # @classmethod.
+        post_init = []
+        cls_attr = getattr_static(cls, "__post_init__", None)
+        if cls_attr is None:
+            post_init_parameters = []
+        else:
+            __post_init__ = cast("Callable", cls.__post_init__)
+            if not callable(__post_init__):
+                msg = "'__post_init__' attribute must be callable"
+                raise TypeError(msg)
+
+            post_init_raw_signature = signature(__post_init__)
+            post_init_parameters = list(post_init_raw_signature.parameters.values())
+            if not isinstance(cls_attr, (classmethod, staticmethod)):
+                post_init_parameters.pop(0)
+
+        kinds = {parameter.kind for parameter in post_init_parameters}
+        # If `__post_init__` accepts positional arguments
+        if kinds & {
+            Parameter.POSITIONAL_OR_KEYWORD,
+            Parameter.POSITIONAL_ONLY,
+            Parameter.VAR_POSITIONAL,
+        }:
+            post_init.append(
+                Parameter("post_init_args", Parameter.POSITIONAL_ONLY, default=[]),
+            )
+
+        # If `__post_init__` accepts keyword arguments
+        if kinds & {
+            Parameter.POSITIONAL_OR_KEYWORD,
+            Parameter.KEYWORD_ONLY,
+            Parameter.VAR_KEYWORD,
+        }:
+            post_init.append(
+                Parameter("post_init_kwargs", Parameter.POSITIONAL_ONLY, default={}),
+            )
+
+        # Retrieve params signature
         parameters = tuple(
             Parameter(
                 param,
@@ -298,7 +343,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
             )
             for param, annotation in getattr(cls, IMPL).annotations.items()
         )
-        return Signature(parameters)
+        return Signature([*post_init, *parameters])
 
 
 class RawParamClass(metaclass=_MetaParamClass):
@@ -308,9 +353,6 @@ class RawParamClass(metaclass=_MetaParamClass):
     #
     def _on_param_will_be_set(self, attr: str, future_val: object) -> None:
         """Call before parameter assignment."""
-
-    def __post_init__(self, *args: object, **kwargs: object) -> None:
-        """Init logic, after parameters assignment."""
 
     @recursive_repr()
     def __repr__(self) -> str:
@@ -337,22 +379,30 @@ class RawParamClass(metaclass=_MetaParamClass):
     @protected  # type: ignore[misc]  # mypy is fooled
     def __init__(
         self,
-        args: list | None = None,
-        kwargs: dict | None = None,
+        args: list[object] | None = None,
+        kwargs: dict[str, object] | None = None,
         /,
         **param_values: object,
     ) -> None:
-        """Set parameters and call `__post_init__`.
+        """Set parameters and call `__post_init__` if defined.
 
         Arguments:
-            args (list | None): If not `None`, unpacked as positional
-                arguments for `__post_init__`.
-            kwargs (dict | None): If not `None`, unpacked as keyword
-                arguments for `__post_init__`.
+            args (list[object] | None): If not `None`, unpacked as
+                positional arguments for `__post_init__` -- if not
+                defined, raises `TypeError`.
+            kwargs (dict[str, object] | None): If not `None`, unpacked
+                as keyword arguments for `__post_init__` -- if not
+                defined, raises `TypeError`.
             **param_values (object): Assigned parameter values at
                 instantiation.
 
         """
+        if not hasattr(self, "__post_init__") and (
+            args is not None or kwargs is not None
+        ):
+            msg = "Unexpected positional arguments (no `__post_init__` is defined)"
+            raise TypeError(msg)
+
         # Set params: KEEP UP-TO-DATE with `ParamClass.set_params`!
         wrong = set(param_values) - set(getattr(self, IMPL).annotations)
         if wrong:
@@ -363,11 +413,14 @@ class RawParamClass(metaclass=_MetaParamClass):
             setattr(self, attr, val)
 
         # Call `__post_init__`
+        if not hasattr(self, "__post_init__"):
+            return
+
         if args is None:
             args = []
         if kwargs is None:
             kwargs = {}
-        self.__post_init__(*args, **kwargs)
+        self.__post_init__(*args, **kwargs)  # type: ignore[operator]  # github.com/eliegoudout/paramclasses/issues/34
 
     @protected
     def __getattribute__(self, attr: str) -> object:  # type: ignore[override]  # mypy is fooled
@@ -465,13 +518,12 @@ class ParamClass(RawParamClass):
 
     Unprotected methods:
         _on_param_will_be_set: Call before parameter assignment.
-        __post_init__: Init logic, after parameters assignment.
         __repr__: Show all params, e.g. `A(z=?)`.
         __str__: Show all nondefault or missing, e.g. `A(x=1, z=?)`.
 
     Protected methods:
         set_params: Set multiple parameter values at once via keywords.
-        __init__: Set parameters and call `__post_init__`.
+        __init__: Set parameters and call `__post_init__` if defined.
         __getattribute__: Handle descriptor parameters.
         __setattr__: Handle protection, missing value, descriptor
             parameters.

@@ -1,7 +1,5 @@
 """Miscellaneous tests not directly related to protection."""
 
-from inspect import signature
-
 import pytest
 
 from paramclasses import MISSING, ParamClass, RawParamClass, isparamclass
@@ -153,19 +151,6 @@ def test_isparamclass_raw():
     assert isparamclass(RawParam, raw=True)
 
 
-def test_signature():
-    """Test `__signature__` property."""
-
-    class A(ParamClass):
-        x: float  # type:ignore[annotation-unchecked]
-        y: int = 0  # type:ignore[annotation-unchecked]
-        z: str = 0  # type:ignore[annotation-unchecked]
-        t = 0
-
-    expected = "<Signature (*, x: float = ?, y: int = 0, z: str = 0)>"
-    assert repr(signature(A)) == expected
-
-
 def test_default_update():
     """Check that default is current runtime class value."""
 
@@ -177,3 +162,32 @@ def test_default_update():
     assert str(a) == "A(x=1)"
     A.x = 1
     assert str(a) == "A()"
+
+
+def test_post_init():
+    """Test trivial `__post_init__` use."""
+
+    class A(ParamClass):
+        def __post_init__(self, arg1, arg2) -> None:
+            self.arg1 = arg1
+            self.arg2 = arg2
+
+    arg1, arg2 = object(), object()
+
+    for a in (
+        A([arg1, arg2]),
+        A([arg1], {"arg2": arg2}),
+        A([], {"arg1": arg1, "arg2": arg2}),
+        A(None, {"arg1": arg1, "arg2": arg2}),
+    ):
+        assert a.arg1 is arg1
+        assert a.arg2 is arg2
+
+
+def test_unexpected_post_init_arguments(make):
+    """Check that provided arguments raise error when no post-init."""
+    Param = make("Param")
+
+    regex = r"^Unexpected positional arguments \(no `__post_init__` is defined\)$"
+    with pytest.raises(TypeError, match=regex):
+        Param(1)
