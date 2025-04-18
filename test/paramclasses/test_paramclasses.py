@@ -191,3 +191,19 @@ def test_unexpected_post_init_arguments(make):
     regex = r"^Unexpected positional arguments \(no `__post_init__` is defined\)$"
     with pytest.raises(TypeError, match=regex):
         Param(1)
+
+
+def test_invalid_mro():
+    """Check that MRO must have paramclasses first."""
+
+    class A(ParamClass): ...
+
+    class B: ...
+
+    regex = (
+        r"^Cannot create a valid method resolution order \(MRO\) for bases B, A: "
+        "paramclass A would come after nonparamclass B$"
+    )
+    with pytest.raises(TypeError, match=regex):
+
+        class C(B, A): ...

@@ -13,7 +13,9 @@ __all__ = [
 import sys
 from abc import ABCMeta
 from dataclasses import dataclass
+from functools import partial
 from inspect import Parameter, Signature, getattr_static, signature
+from itertools import pairwise
 from reprlib import recursive_repr
 from types import MappingProxyType
 from typing import TYPE_CHECKING, NamedTuple, cast, final
@@ -167,6 +169,28 @@ def _update_while_checking_consistency(orig: dict, update: MappingProxyType) -> 
             raise ProtectedError(msg)
 
 
+def _check_valid_mro(mro: tuple[type, ...], bases: tuple[type, ...]) -> None:
+    """Check that new MRO tail puts all paramclasses first."""
+    # Special case to avoid circle definition with `isparamclass`. This
+    # allow definition of `RawParamClass` first, then `isparamclass`,
+    # then `ParamClass`.
+    if len(mro) <= 1:
+        return
+
+    for (cls1, isparamclass1), (cls2, isparamclass2) in pairwise(
+        zip(mro, map(partial(isparamclass, raw=True), mro), strict=True),
+    ):
+        if isparamclass1 or not isparamclass2:
+            continue
+
+        msg = (
+            "Cannot create a valid method resolution order (MRO) for bases "
+            f"{', '.join(base.__name__ for base in bases)}: paramclass "
+            f"{cls2.__name__} would come after nonparamclass {cls1.__name__}"
+        )
+        raise TypeError(msg)
+
+
 @final
 class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     """Specifically implemented as `RawParamClass`'s metaclass.
@@ -241,7 +265,10 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
         # Update namespace
         namespace_final[IMPL] = Impl(*map(MappingProxyType, [annotations, protected]))
+
+        # Create the class and check MRO
         cls = ABCMeta.__new__(mcs, name, bases, namespace_final)
+        _check_valid_mro(cls.__mro__[1:], bases)
 
         # Declare `cls` as owner for newly protected attributes
         for attr in protected_new:
@@ -494,6 +521,21 @@ class RawParamClass(metaclass=_MetaParamClass):
             object.__delattr__(self, attr)
 
 
+# Define this right after `RawParamClass` since it is called at `ParamClass` creation.
+def isparamclass(cls: type, *, raw: bool = False) -> bool:
+    """Check if `cls` is a (raw)paramclass.
+
+    If `raw`, subclassing `RawParamClass` is enough to return `True`.
+    """
+    # Should have same metaclass
+    if type(cls) is not type(RawParamClass):
+        return False
+
+    # Should inherit from `(Raw)ParamClass`
+    base_paramclass = RawParamClass if raw else ParamClass
+    return any(base is base_paramclass for base in cls.__mro__)
+
+
 class ParamClass(RawParamClass):
     """Parameter-holding class with robust subclassing protection.
 
@@ -565,17 +607,3 @@ class ParamClass(RawParamClass):
             for attr in getattr(self, IMPL).annotations
             if not hasattr(self, attr) or getattr(self, attr) is MISSING
         )
-
-
-def isparamclass(cls: type, *, raw: bool = False) -> bool:
-    """Check if `cls` is a (raw)paramclass.
-
-    If `raw`, subclassing `RawParamClass` is enough to return `True`.
-    """
-    # Should have same metaclass
-    if type(cls) is not type(RawParamClass):
-        return False
-
-    # Should inherit from `(Raw)ParamClass`
-    base_paramclass = RawParamClass if raw else ParamClass
-    return any(base is base_paramclass for base in cls.__mro__)
