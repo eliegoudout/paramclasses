@@ -37,6 +37,7 @@ dev = [
 
 [tool.ruff.lint]
 select = ["ALL"]
+ignore = ["D416"]  # NumPy docstyle
 
 [tool.ruff.lint.per-file-ignores]
 "test/**/*.py" = [
