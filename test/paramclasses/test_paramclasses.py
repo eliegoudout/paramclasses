@@ -142,13 +142,13 @@ def test_isparamclass_works_even_against_virtual(make):
     assert not isparamclass(Vanilla)
 
 
-def test_isparamclass_raw():
-    """Test `isparamclass` in `raw` mode."""
+def test_isparamclass():
+    """Test `isparamclass` mode."""
 
     class RawParam(RawParamClass): ...
 
-    assert not isparamclass(RawParam)
-    assert isparamclass(RawParam, raw=True)
+    assert isparamclass(RawParam)
+    assert not isparamclass(RawParam, raw=False)
 
 
 def test_default_update():
@@ -201,9 +201,32 @@ def test_invalid_mro():
     class B: ...
 
     regex = (
-        r"^Cannot create a valid method resolution order \(MRO\) for bases B, A: "
-        "paramclass A would come after nonparamclass B$"
+        r"^Cannot create a valid method resolution order \(MRO\) for bases B, A:"
+        r" paramclass A would come after nonparamclass B$"
     )
     with pytest.raises(TypeError, match=regex):
 
         class C(B, A): ...
+
+
+def test_cannot_use_metaclass_alone():
+    """Forbid simple metaclass without inheritance."""
+    regex = (
+        r"^Function '_skip_mro_check' should only be called once: metaclass"
+        " '_MetaParamClass' should never be explicitly passed except when constructing"
+        r" 'RawParamClass'$"
+    )
+    with pytest.raises(RuntimeError, match=regex):
+
+        class A(metaclass=type(ParamClass)): ...
+
+
+def test_metaclass_requires_inheriting_from_rawparamclass():
+    """Check that paramclasses must inherit from RawParamClass."""
+    regex = r"^Paramclasses must always inherit from 'RawParamClass'$"
+    with pytest.raises(TypeError, match=regex):
+
+        class A(int, metaclass=type(ParamClass)): ...
+
+    # The (redundant) following works fine
+    class A(ParamClass, metaclass=type(ParamClass)): ...

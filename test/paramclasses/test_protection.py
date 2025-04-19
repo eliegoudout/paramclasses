@@ -12,18 +12,20 @@ def test_mcs_is_frozen(assert_set_del_is_protected):
     """
     mcs = type(ParamClass)
     attr = "random_attribute"
-    regex = r"^`_MetaParamClass' attributes are frozen$"
+    regex = r"^'_MetaParamClass' attributes are frozen$"
     assert_set_del_is_protected(mcs, attr, regex)
 
 
 def test_cannot_subclass_mcs():
     """Cannot subclass `_MetaParamClass' (without altering its meta)."""
     mcs = type(ParamClass)
-    regex = r"^`_MetaParamClass' cannot be subclassed$"
-    with pytest.raises(ProtectedError, match=regex):
+    regex = (
+        r"^Function '__new__' should only be called once: '_MetaFrozen' should only"
+        r" construct '_MetaParamClass'$"
+    )
+    with pytest.raises(RuntimeError, match=regex):
 
-        class Sub(mcs):
-            __new__ = type.__new__
+        class Sub(mcs): ...
 
 
 def test_multiple_protection():

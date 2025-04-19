@@ -12,17 +12,15 @@ __all__ = [
 
 import sys
 from abc import ABCMeta
+from collections.abc import Callable
 from dataclasses import dataclass
-from functools import partial
+from functools import wraps
 from inspect import Parameter, Signature, getattr_static, signature
 from itertools import pairwise
 from reprlib import recursive_repr
 from types import MappingProxyType
-from typing import TYPE_CHECKING, NamedTuple, cast, final
+from typing import NamedTuple, ParamSpec, TypeVar, cast, final
 from warnings import warn
-
-if TYPE_CHECKING:  # pragma: no cover
-    from collections.abc import Callable
 
 
 @dataclass(frozen=True)
@@ -68,6 +66,31 @@ class ProtectedError(AttributeError):
     __module__ = "builtins"
 
 
+_T = TypeVar("_T")
+_P = ParamSpec("_P")
+
+
+def _run_once(reason: str) -> Callable[[Callable[_P, _T]], Callable[_P, _T]]:
+    """Make sure the decorated function can only be called once."""
+
+    def _decorator(func: Callable[_P, _T]) -> Callable[_P, _T]:
+        flag = None
+
+        @wraps(func)
+        def _func_runs_once(*args: _P.args, **kwargs: _P.kwargs) -> _T:
+            nonlocal flag
+            try:
+                del flag
+            except NameError:
+                msg = f"Function '{func.__name__}' should only be called once: {reason}"
+                raise RuntimeError(msg) from None
+            return func(*args, **kwargs)
+
+        return _func_runs_once
+
+    return _decorator
+
+
 @final
 class _MetaFrozen(type):
     """Make `_MetaParamClass` frozen with this metaclass.
@@ -77,18 +100,16 @@ class _MetaFrozen(type):
     `_MetaParamClass` subclassing.
     """
 
-    def __new__(mcs, name: str, bases: tuple, namespace: dict[str, object]) -> type:
-        if not (len(bases) == 1 and name == "_MetaParamClass" and bases[0] is ABCMeta):
-            msg = "`_MetaParamClass' cannot be subclassed"
-            raise ProtectedError(msg)
-        return type.__new__(mcs, name, bases, namespace)
+    __new__ = _run_once("'_MetaFrozen' should only construct '_MetaParamClass'")(
+        type.__new__,
+    )  # type: ignore[assignment]
 
     def __setattr__(*_: object, **__: object) -> None:
-        msg = "`_MetaParamClass' attributes are frozen"
+        msg = "'_MetaParamClass' attributes are frozen"
         raise ProtectedError(msg)
 
     def __delattr__(*_: object, **__: object) -> None:
-        msg = "`_MetaParamClass' attributes are frozen"
+        msg = "'_MetaParamClass' attributes are frozen"
         raise ProtectedError(msg)
 
 
@@ -169,17 +190,50 @@ def _update_while_checking_consistency(orig: dict, update: MappingProxyType) -> 
             raise ProtectedError(msg)
 
 
-def _check_valid_mro(mro: tuple[type, ...], bases: tuple[type, ...]) -> None:
-    """Check that new MRO tail puts all paramclasses first."""
-    # Special case to avoid circle definition with `isparamclass`. This
-    # allow definition of `RawParamClass` first, then `isparamclass`,
-    # then `ParamClass`.
-    if len(mro) <= 1:
+@_run_once(
+    "metaclass '_MetaParamClass' should never be explicitly passed except when "
+    "constructing 'RawParamClass'",
+)
+def _skip_mro_check() -> None:
+    """For ``RawParamClass`` only, no check required."""
+
+
+def _check_valid_mro(tail: tuple[type, ...], bases: tuple[type, ...]) -> None:
+    """Check that new MRO tail is valid.
+
+    Two conditions must be met:
+
+    1. Only :class:`RawParamClass` can have ``len(tail) <= 1``. It is
+       ensured by restricting to only a unique call with such case. This
+       works since :class:`RawParamClass` is executed right after
+       :class:'_MetaParamClass'.
+    2. Else, :class:`RawParamClass` must be in the MRO and all
+       paramclasses must come first.
+
+    Arguments
+    ---------
+    tail: ``tuple[type, ...]``
+        The **tail** of the MRO of the newly created class.
+    bases: ``tuple[type, ...]``
+        Bases for the newly created class.
+
+    Notes
+    -----
+    The special case of :class:`RawParamClass` is handled separately to
+    avoid circle definition with :func:`isparamclass`. It is crucial
+    that the following objects are defined in that order:
+    `_MetaParamClass -> RawParamClass -> isparamclass -> ParamClass`.
+
+    """
+    if len(tail) <= 1:
+        _skip_mro_check()
         return
 
+    found_rawparamclass = isparamclass(bases[0])
     for (cls1, isparamclass1), (cls2, isparamclass2) in pairwise(
-        zip(mro, map(partial(isparamclass, raw=True), mro), strict=True),
+        zip(tail, map(isparamclass, tail), strict=True),
     ):
+        found_rawparamclass |= isparamclass2
         if isparamclass1 or not isparamclass2:
             continue
 
@@ -188,6 +242,10 @@ def _check_valid_mro(mro: tuple[type, ...], bases: tuple[type, ...]) -> None:
             f"{', '.join(base.__name__ for base in bases)}: paramclass "
             f"{cls2.__name__} would come after nonparamclass {cls1.__name__}"
         )
+        raise TypeError(msg)
+
+    if not found_rawparamclass:
+        msg = "Paramclasses must always inherit from 'RawParamClass'"
         raise TypeError(msg)
 
 
@@ -522,7 +580,7 @@ class RawParamClass(metaclass=_MetaParamClass):
 
 
 # Define this right after `RawParamClass` since it is called at `ParamClass` creation.
-def isparamclass(cls: type, *, raw: bool = False) -> bool:
+def isparamclass(cls: type, *, raw: bool = True) -> bool:
     """Check if `cls` is a (raw)paramclass.
 
     If `raw`, subclassing `RawParamClass` is enough to return `True`.
