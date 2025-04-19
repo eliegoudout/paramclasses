@@ -398,9 +398,16 @@ ProtectedError: 'x' protection conflict: 'A', 'B'
 
 It is possible to inherit from a mix of _paramclasses_ and non-_paramclasses_, with the two following limitations.
 
-1. Because `type(ParamClass)` is a subclass of `ABCMeta`, non-_paramclass_ bases must be either vanilla classes or abstract classes.
+1. Because `type(ParamClass)` only inherits from `ABCMeta`, non-_paramclass_ bases must be either vanilla classes or abstract classes.
 2. Behaviour is not guaranteed for non-_paramclass_ bases with an `IMPL`-named attribute -- _see [Subclassing API](#3-subclassing-api-)_.
-3. Until [#28](https://github.com/eliegoudout/paramclasses/issues/28) is fixed, one should manually ensure that MRO does not prioritize any non-paramclass before all paramclasses.
+3. The MRO of classes created with multiple inheritance should always have all of its paramclasses in front of non-paramclasses (see [#28](https://github.com/eliegoudout/paramclasses/issues/28)). This is enforced since failing to do so will raise a `TypeError`:
+
+```pycon
+>>> class A(int, ParamClass): ...
+...
+<traceback>
+TypeError: Invalid method resolution order (MRO) for bases int, ParamClass: nonparamclass 'int' would come before paramclass 'ParamClass'
+```
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 

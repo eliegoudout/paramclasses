@@ -201,8 +201,8 @@ def test_invalid_mro():
     class B: ...
 
     regex = (
-        r"^Cannot create a valid method resolution order \(MRO\) for bases B, A:"
-        r" paramclass A would come after nonparamclass B$"
+        r"^Invalid method resolution order \(MRO\) for bases B, A: nonparamclass 'B'"
+        r" would come before paramclass 'A'$"
     )
     with pytest.raises(TypeError, match=regex):
 

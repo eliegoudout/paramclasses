@@ -238,9 +238,9 @@ def _check_valid_mro(tail: tuple[type, ...], bases: tuple[type, ...]) -> None:
             continue
 
         msg = (
-            "Cannot create a valid method resolution order (MRO) for bases "
-            f"{', '.join(base.__name__ for base in bases)}: paramclass "
-            f"{cls2.__name__} would come after nonparamclass {cls1.__name__}"
+            "Invalid method resolution order (MRO) for bases "
+            f"{', '.join(base.__name__ for base in bases)}: nonparamclass "
+            f"'{cls1.__name__}' would come before paramclass '{cls2.__name__}'"
         )
         raise TypeError(msg)
 
