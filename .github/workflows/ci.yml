@@ -39,7 +39,7 @@ jobs:
           uv build
       - name: Installing
         run: |
-          uv pip install dist/paramclasses-0.3.4-py3-none-any.whl
+          uv pip install dist/paramclasses-0.3.5-py3-none-any.whl
       - name: Run pytest with coverage
         run: |
           uv run pytest --cov-report=xml
