@@ -50,6 +50,10 @@ ignore = ["D416"]  # NumPy docstyle
     "ANN201",                # No need for tests return type
     "PLR0913",               # Many fixtures needed sometimes
 ]
+"mypy/test.py" = [
+    "D100", "D101", "D102",  # Comments are enough
+    "INP001",                # Not part of namespace package
+]
 
 [tool.ruff.format]
 docstring-code-format = true  # Enable reformatting of code snippets in docstrings.
