@@ -71,7 +71,7 @@ Note that the protection provided by _paramclasses_ is very robust for **practic
 
 ### Defining a _paramclass_
 
-A _paramclass_ is simply defined by subclassing `ParamClass` directly or another _paramclass_. Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), **parameters** are identified as **any annotated attribute** and instanciation logic is automatically built-in -- though it can be [extended](#instantiation-logic-with-__post_init__). In our context, "default" means the current class value, which may change after the instanciation of an object.
+A _paramclass_ is simply defined by subclassing `ParamClass` directly or another _paramclass_. Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), **parameters** are identified as **any annotated attribute** and instantiation logic is automatically built-in -- though it can be [extended](#instantiation-logic-with-__post_init__). In our context, "default" means the current class value, which may change after the instantiation of an object.
 ```python
 from paramclasses import ParamClass
 
@@ -449,12 +449,9 @@ There is no such thing as "perfect attribute protection" in Python. As such `Par
 
 ### Type checkers
 
-The `@protected` decorator is not acting in the usual sense, as it is a simple wrapper meant to be detected and unwrapped by the metaclass constructing _paramclasses_. Consequently, type checkers such as [mypy](https://mypy-lang.org/) may be confused. If necessary, we recommend locally disabling type checking with the following comment -- and the appropriate [error-code](https://mypy.readthedocs.io/en/stable/error_codes.html).
-```python
-@protected  # type: ignore[error-code]  # mypy is fooled
-def my_protected_method(self):
-```
-It is not ideal and _may_ be fixed in future updates.
+There are currently some [known issues](https://github.com/eliegoudout/paramclasses/issues/34#issuecomment-2918905520) regarding static type checking. The implementation of a `mypy` plugin may solve these in a *not-so-far* future. In the mean time, it is advised to check the link to understand false positives **and negatives** that may occur.
+
+Any contribution regarding this fix is very welcome!
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
