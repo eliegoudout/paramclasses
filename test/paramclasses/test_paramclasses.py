@@ -178,7 +178,6 @@ def test_post_init():
         A([arg1, arg2]),
         A([arg1], {"arg2": arg2}),
         A([], {"arg1": arg1, "arg2": arg2}),
-        A(None, {"arg1": arg1, "arg2": arg2}),
     ):
         assert a.arg1 is arg1
         assert a.arg2 is arg2

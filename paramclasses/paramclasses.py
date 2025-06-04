@@ -249,6 +249,48 @@ def _check_valid_mro(tail: tuple[type, ...], bases: tuple[type, ...]) -> None:
         raise TypeError(msg)
 
 
+def _post_init_accepts_arg_kwargs(cls: type) -> tuple[bool, bool]:
+    """Whether :meth:`__post_init__` method accepts args and/or kwargs.
+
+    Arguments
+    ---------
+    cls: ``type``
+        The class to analyze. It must define ``__post_init__``, either
+        a classical method, a ``classmethod`` or a ``staticmethod``.
+
+    Returns
+    -------
+    accepts_args: ``bool``
+        Explicit.
+    accepts_kwargs: ``bool``
+        Explicit.
+
+    Raises
+    ------
+    ValueError:
+        if ``cls`` has no attribute ``__post_init__``.
+    TypeError:
+        If :meth:`__post_init__` is not ``Callable``.
+
+    """
+    cls_attr = getattr_static(cls, "__post_init__")
+    __post_init__ = cast("Callable", cls.__post_init__)
+    if not callable(__post_init__):
+        msg = "'__post_init__' attribute must be callable"
+        raise TypeError(msg)
+
+    raw_signature = signature(__post_init__)
+    parameters = list(raw_signature.parameters.values())
+    if not isinstance(cls_attr, (classmethod, staticmethod)):
+        parameters.pop(0)
+
+    kinds = {parameter.kind for parameter in parameters}
+    accepts_args = bool(kinds & {Parameter.POSITIONAL_OR_KEYWORD,Parameter.POSITIONAL_ONLY,Parameter.VAR_POSITIONAL,})
+    accepts_kwargs = bool(kinds & {Parameter.POSITIONAL_OR_KEYWORD,Parameter.KEYWORD_ONLY,Parameter.VAR_KEYWORD,})
+
+    return accepts_args, accepts_kwargs
+
+
 @final
 class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     """Specifically implemented as `RawParamClass`'s metaclass.
@@ -377,43 +419,18 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
     @property
     def __signature__(cls) -> Signature:
-        # Include `__post_init__` signature, if defined. Specifically,
-        # adds a positional-only `post_init_args` (resp.
-        # `post_init_kwargs`) if `__post_init__` accepts any positional
-        # (resp. keyword) argument. Handles @staticmethod and
-        # @classmethod.
-        post_init = []
-        cls_attr = getattr_static(cls, "__post_init__", None)
-        if cls_attr is None:
-            post_init_parameters = []
+        # Retrieve ``__post_init__`` signature part
+        if hasattr(cls, "__post_init__"):
+            accept_args, accepts_kwargs = _post_init_accepts_arg_kwargs(cls)
         else:
-            __post_init__ = cast("Callable", cls.__post_init__)
-            if not callable(__post_init__):
-                msg = "'__post_init__' attribute must be callable"
-                raise TypeError(msg)
+            accept_args, accepts_kwargs = False, False
 
-            post_init_raw_signature = signature(__post_init__)
-            post_init_parameters = list(post_init_raw_signature.parameters.values())
-            if not isinstance(cls_attr, (classmethod, staticmethod)):
-                post_init_parameters.pop(0)
-
-        kinds = {parameter.kind for parameter in post_init_parameters}
-        # If `__post_init__` accepts positional arguments
-        if kinds & {
-            Parameter.POSITIONAL_OR_KEYWORD,
-            Parameter.POSITIONAL_ONLY,
-            Parameter.VAR_POSITIONAL,
-        }:
+        post_init = []
+        if accept_args:
             post_init.append(
                 Parameter("post_init_args", Parameter.POSITIONAL_ONLY, default=[]),
             )
-
-        # If `__post_init__` accepts keyword arguments
-        if kinds & {
-            Parameter.POSITIONAL_OR_KEYWORD,
-            Parameter.KEYWORD_ONLY,
-            Parameter.VAR_KEYWORD,
-        }:
+        if accepts_kwargs:
             post_init.append(
                 Parameter("post_init_kwargs", Parameter.POSITIONAL_ONLY, default={}),
             )
@@ -464,30 +481,19 @@ class RawParamClass(metaclass=_MetaParamClass):
     @protected  # type: ignore[misc]  # mypy is fooled
     def __init__(
         self,
-        args: list[object] | None = None,
-        kwargs: dict[str, object] | None = None,
-        /,
+        *args_kwargs: object,
         **param_values: object,
     ) -> None:
-        """Set parameters and call `__post_init__` if defined.
+        """Set parameters and call ``__post_init__`` if defined.
 
-        Arguments:
-            args (list[object] | None): If not `None`, unpacked as
-                positional arguments for `__post_init__` -- if not
-                defined, raises `TypeError`.
-            kwargs (dict[str, object] | None): If not `None`, unpacked
-                as keyword arguments for `__post_init__` -- if not
-                defined, raises `TypeError`.
-            **param_values (object): Assigned parameter values at
-                instantiation.
+        Arguments
+        ---------
+        args_kwargs: ``object``
+            To do.
+        **param_values: ``object``
+            Assigned parameter values at instantiation.
 
         """
-        if not hasattr(self, "__post_init__") and (
-            args is not None or kwargs is not None
-        ):
-            msg = "Unexpected positional arguments (no `__post_init__` is defined)"
-            raise TypeError(msg)
-
         # Set params: KEEP UP-TO-DATE with `ParamClass.set_params`!
         wrong = set(param_values) - set(getattr(self, IMPL).annotations)
         if wrong:
@@ -497,14 +503,40 @@ class RawParamClass(metaclass=_MetaParamClass):
         for attr, val in param_values.items():
             setattr(self, attr, val)
 
-        # Call `__post_init__`
-        if not hasattr(self, "__post_init__"):
-            return
+        # Call ``__post_init__``
+        cls = type(self)
+        given = len(args_kwargs)
+        if not hasattr(cls, "__post_init__"):
+            if not given:
+                return
+            msg = "Unexpected positional arguments (no `__post_init__` is defined)"
+            raise TypeError(msg)
 
-        if args is None:
-            args = []
-        if kwargs is None:
-            kwargs = {}
+        accepts_arg, accepts_kwargs = _post_init_accepts_arg_kwargs(cls)
+        msg = ""
+
+        # Sanitize ``__post_init__`` arguments
+        if given == 0:
+            args, kwargs = [], {}
+        elif given > accepts_arg + accepts_kwargs:
+            msg = (
+                f"Invalid call with `__post_init__`. Expected signature: {cls.__name__}"
+                f"{signature(cls)}"
+            )
+            err = TypeError(msg)
+        elif accepts_arg and accepts_kwargs:
+            args, kwargs = args_kwargs if given == 2 else (*args_kwargs, {})
+        elif accepts_arg and not accepts_kwargs:
+            args, kwargs = *args_kwargs, {}
+        elif not accepts_arg and accepts_kwargs:
+            args, kwargs = [], *args_kwargs
+        else:
+            msg = f"Unexpected error while sanitizing `__post_init__` arguments."
+            err = RuntimeError(msg)
+
+        if msg:
+            raise err
+
         self.__post_init__(*args, **kwargs)  # type: ignore[operator]  # github.com/eliegoudout/paramclasses/issues/34
 
     @protected

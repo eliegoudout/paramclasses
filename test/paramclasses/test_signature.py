@@ -48,6 +48,7 @@ def test_signature_post_init_pos_and_kw():
     Test classical method, staticmethod and classmethod.
     """
 
+    # Signature `(a, /, b, *, c)`
     class A(ParamClass):
         def __post_init__(self, a, /, b, *, c) -> None:
             """Test with standard method."""
@@ -62,8 +63,53 @@ def test_signature_post_init_pos_and_kw():
         def __post_init__(a, /, b, *, c) -> None:
             """Test with staticmethod."""
 
+    # Signature `(a, /, b)`
+    class D(ParamClass):
+        def __post_init__(self, a, /, b) -> None:
+            """Test with standard method."""
+
+    class E(ParamClass):
+        @classmethod
+        def __post_init__(cls, a, /, b) -> None:
+            """Test with classmethod."""
+
+    class F(ParamClass):
+        @staticmethod
+        def __post_init__(a, /, b) -> None:
+            """Test with staticmethod."""
+
+    # Signature `(b, *, c)`
+    class G(ParamClass):
+        def __post_init__(self, b, *, c) -> None:
+            """Test with standard method."""
+
+    class H(ParamClass):
+        @classmethod
+        def __post_init__(cls, b, *, c) -> None:
+            """Test with classmethod."""
+
+    class I(ParamClass):
+        @staticmethod
+        def __post_init__(b, *, c) -> None:
+            """Test with staticmethod."""
+
+    # Signature `(b)`
+    class J(ParamClass):
+        def __post_init__(self, b) -> None:
+            """Test with standard method."""
+
+    class K(ParamClass):
+        @classmethod
+        def __post_init__(cls, b) -> None:
+            """Test with classmethod."""
+
+    class L(ParamClass):
+        @staticmethod
+        def __post_init__(b) -> None:
+            """Test with staticmethod."""
+
     expected = "(post_init_args=[], post_init_kwargs={}, /)"
-    for cls in [A, B, C]:
+    for cls in [A, B, C, D, E, F, G, H, I, J, K, L]:
         assert repr(signature(cls)) == f"<Signature {expected}>"
 
 
