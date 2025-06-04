@@ -62,6 +62,7 @@ preview = true
 
 [tool.mypy]
 files = ["paramclasses", "test"]
+plugins = "mypy/plugins/paramclasses.py"
 
 
 [tool.pytest.ini_options]
