@@ -160,7 +160,7 @@ wheels = [
 
 [[package]]
 name = "paramclasses"
-version = "0.3.6.dev0"
+version = "0.3.6"
 source = { editable = "." }
 
 [package.dev-dependencies]
