@@ -150,30 +150,25 @@ def _get_namespace_annotations(
     namespace: dict[str, object],
 ) -> dict[str, object]:  # pragma: no cover
     """Get annotations from a namespace dict, 3.14 compatible."""
-    __annotations__ = cast("dict[str, object] | None", namespace.get("__annotations__"))
-
     if sys.version_info < (3, 14):
-        return {} if __annotations__ is None else __annotations__
+        return cast("dict[str, object]", namespace.get("__annotations__", {}))
 
     # For python >= 3.14
-    # https://discuss.python.org/t/python-3-14-metaclasses-interact-with-annotations-from-namespace-dict/87010
-    __annotate__ = namespace.get("__annotate__")
+    # https://docs.python.org/3.14/library/annotationlib.html#using-annotations-in-a-metaclass
+    if "__annotations__" in namespace:  # from __future__ import annotations
+        return cast("dict[str, object]", namespace["__annotations__"])
 
-    if __annotations__ is None:
-        if __annotate__ is None:
-            return {}
+    from annotationlib import (  # type: ignore[import-not-found]
+        Format,
+        call_annotate_function,
+        get_annotate_from_class_namespace,
+    )
 
-        from annotationlib import (  # type: ignore[import-not-found]
-            Format,
-            call_annotate_function,
-        )
+    annotate = get_annotate_from_class_namespace(namespace)
+    if annotate is None:
+        return {}
 
-        return call_annotate_function(__annotate__, Format.FORWARDREF)
-
-    if __annotate__ is not None:
-        namespace["__annotate__"] = None
-
-    return __annotations__
+    return call_annotate_function(annotate, format=Format.FORWARDREF)
 
 
 def _update_while_checking_consistency(orig: dict, update: MappingProxyType) -> None:
