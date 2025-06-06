@@ -244,14 +244,14 @@ def _check_valid_mro(tail: tuple[type, ...], bases: tuple[type, ...]) -> None:
         raise TypeError(msg)
 
 
-def _post_init_accepts_arg_kwargs(cls: type) -> tuple[bool, bool]:
+def _post_init_accepts_args_kwargs(cls: type) -> tuple[bool, bool]:
     """Whether :meth:`__post_init__` method accepts args and/or kwargs.
 
     Arguments
     ---------
     cls: ``type``
         The class to analyze. It must define ``__post_init__``, either
-        a classical method, a ``classmethod`` or a ``staticmethod``.
+        a normal method, a ``classmethod`` or a ``staticmethod``.
 
     Returns
     -------
@@ -280,8 +280,8 @@ def _post_init_accepts_arg_kwargs(cls: type) -> tuple[bool, bool]:
         parameters.pop(0)
 
     kinds = {parameter.kind for parameter in parameters}
-    accepts_args = bool(kinds & {Parameter.POSITIONAL_OR_KEYWORD,Parameter.POSITIONAL_ONLY,Parameter.VAR_POSITIONAL,})
-    accepts_kwargs = bool(kinds & {Parameter.POSITIONAL_OR_KEYWORD,Parameter.KEYWORD_ONLY,Parameter.VAR_KEYWORD,})
+    accepts_args = bool(kinds & {Parameter.POSITIONAL_OR_KEYWORD, Parameter.POSITIONAL_ONLY, Parameter.VAR_POSITIONAL})
+    accepts_kwargs = bool(kinds & {Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY, Parameter.VAR_KEYWORD})
 
     return accepts_args, accepts_kwargs
 
@@ -416,7 +416,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     def __signature__(cls) -> Signature:
         # Retrieve ``__post_init__`` signature part
         if hasattr(cls, "__post_init__"):
-            accept_args, accepts_kwargs = _post_init_accepts_arg_kwargs(cls)
+            accept_args, accepts_kwargs = _post_init_accepts_args_kwargs(cls)
         else:
             accept_args, accepts_kwargs = False, False
 
@@ -507,32 +507,35 @@ class RawParamClass(metaclass=_MetaParamClass):
             msg = "Unexpected positional arguments (no `__post_init__` is defined)"
             raise TypeError(msg)
 
-        accepts_arg, accepts_kwargs = _post_init_accepts_arg_kwargs(cls)
-        msg = ""
-
         # Sanitize ``__post_init__`` arguments
+        accepts_args, accepts_kwargs = _post_init_accepts_args_kwargs(cls)
         if given == 0:
             args, kwargs = [], {}
-        elif given > accepts_arg + accepts_kwargs:
+        elif given > accepts_args + accepts_kwargs:
             msg = (
-                f"Invalid call with `__post_init__`. Expected signature: {cls.__name__}"
-                f"{signature(cls)}"
+                f"Invalid arguments. Expected signature: {cls.__name__}{signature(cls)}"
             )
-            err = TypeError(msg)
-        elif accepts_arg and accepts_kwargs:
+            raise TypeError(msg)
+        elif accepts_args and accepts_kwargs:
             args, kwargs = args_kwargs if given == 2 else (*args_kwargs, {})
-        elif accepts_arg and not accepts_kwargs:
+        elif accepts_args and not accepts_kwargs:
             args, kwargs = *args_kwargs, {}
-        elif not accepts_arg and accepts_kwargs:
+            if isinstance(args, Mapping):
+                msg = (
+                    "Passing `post_init_args` as mapping is not supported. Use "
+                    "`iter(your_mapping)` instead"
+                )
+                raise TypeError(msg)
+        elif not accepts_args and accepts_kwargs:
             args, kwargs = [], *args_kwargs
         else:
             msg = f"Unexpected error while sanitizing `__post_init__` arguments."
-            err = RuntimeError(msg)
+            raise RuntimeError(msg)
 
-        if msg:
-            raise err
-
-        self.__post_init__(*args, **kwargs)  # type: ignore[operator]  # github.com/eliegoudout/paramclasses/issues/34
+        out = self.__post_init__(*args, **kwargs)  # type: ignore[operator]  # github.com/eliegoudout/paramclasses/issues/34
+        if out is not None:
+            msg = f"`__post_init__` should return `None` (got {out!r})"
+            raise TypeError(msg)
 
     @protected
     def __getattribute__(self, attr: str) -> object:  # type: ignore[override]  # mypy is fooled
