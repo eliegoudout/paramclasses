@@ -192,6 +192,17 @@ def test_unexpected_post_init_arguments(make):
         Param(1)
 
 
+def test_post_init_must_be_callable():
+    """Test `__signature__` error when `__post_init__` not callable."""
+
+    class A(ParamClass):
+        __post_init__ = 0
+
+    regex = r"^'__post_init__' attribute must be callable$"
+    with pytest.raises(TypeError, match=regex):
+        A.__signature__  # noqa: B018 (not useless)
+
+
 def test_invalid_mro():
     """Check that MRO must have paramclasses first."""
 

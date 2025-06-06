@@ -442,3 +442,82 @@ def parametrize_attr_kind(*filters: str) -> pytest.MarkDecorator:
         return attr_or_kind if isinstance(attr_or_kind, str) else ""
 
     return pytest.mark.parametrize(("attr", "kind"), attributes_kinds(*filters), ids=fn)
+
+
+def parametrize_bool(argnames: str, **kwargs: object) -> pytest.MarkDecorator:
+    """Parametrize each var to be ``True`` or ``False``.
+
+    Arguments
+    ---------
+    vars_str: ``str``
+        Example ``"a, b, c"`` will parametrize for ``a``, ``b`` and
+        ``c`` being ``True`` or ``False``.
+    **kwargs: ``object``
+        Passed to :func:`pytest.mark.parametrize`.
+
+    """
+    return pytest.mark.parametrize(argnames, product([True, False], repeat=len(argnames.split(","))))
+
+
+def make_post_init(pos_only: bool, pos_or_kw: bool, var_pos: bool, kw_only: bool, var_kw: bool, kind: Literal["normal", "static", "class"]) -> Callable:
+    """Create a factory `__post_init__` for related tests.
+
+    Uses ``exec`` with empty ``globals`` and ``locals``.
+
+    Example
+    -------
+    With every kind of arguments and ``kind="class"``, the code is
+    ::
+
+        @classmethod
+        def __post_init__(cls, pos_only, /, pos_or_kw, *var_pos, kw_only, **var_kw):
+            '''Factory `__post_init__`.'''
+            assert pos_only == 'pos_only'
+            assert pos_or_kw == 'pos_or_kw'
+            assert var_pos == ('var_pos',)
+            assert kw_only == 'kw_only'
+            assert var_kw == {'var_kw': 'var_kw'}
+
+    """
+    # Decorator
+    argnames: list[str] = []
+    if kind == "normal":
+        decorator = ""
+        argnames.append("self")
+    elif kind == "static":
+        decorator = "@staticmethod"
+    elif kind == "class":
+        decorator = "@classmethod"
+        argnames.append("cls")
+    else:
+        msg = f"Invalid kind {kind!r}"
+        raise ValueError(msg)
+
+    # Signature and body
+    lines = ["'''Factory `__post_init__`.'''"]
+    if pos_only:
+        argnames.extend(["pos_only", "/"])
+        lines.append("assert pos_only == 'pos_only'")
+    if pos_or_kw:
+        argnames.extend(["pos_or_kw"])
+        lines.append("assert pos_or_kw == 'pos_or_kw'")
+    if var_pos:
+        argnames.extend(["*var_pos"])
+        lines.append("assert var_pos == ('var_pos',)")
+    if kw_only:
+        argnames.extend(["kw_only"] if var_pos else ["*", "kw_only"])
+        lines.append("assert kw_only == 'kw_only'")
+    if var_kw:
+        argnames.extend(["**var_kw"])
+        lines.append("assert var_kw == {'var_kw': 'var_kw'}")
+
+    sig = ", ".join(argnames)
+    body = "\n".join(f"    {line}" for line in lines)
+
+    # Create
+    code = f"{decorator}\ndef __post_init__({sig}):\n{body}\n"
+    container = {}
+    exec(code, globals={}, locals=container)
+    __post_init__ = container.pop("__post_init__")
+
+    return __post_init__
