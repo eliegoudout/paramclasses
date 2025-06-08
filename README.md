@@ -214,19 +214,25 @@ is triggered. For example, it can be used to `unfit` and estimator on specific m
 
 #### Instantiation logic with `__post_init__`
 
-Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), a `__post_init__` method can be defined to complete instantiation after the initial setting of parameter values. It must have signature
-```python
-def __post_init__(self, *args: object, **kwargs: object) -> None
-```
-and is called as follows by `__init__`.
-```python
-# Close equivalent to actual implementation
-@protected
-def __init__(self, args: list[object] = [], kwargs: dict[str, object] = {}, /, **param_values: object) -> None:
-        self.set_params(**param_values)
-        self.__post_init__(*args, **kwargs)
+Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), a `__post_init__` method can be defined to complete instantiation after the initial setting of parameter values. It must **always** return `None`.
 
+In general, it as called as follows by `__init__`.
+
+```python
+@protected
+def __init__(
+    self,
+    post_init_args: list[object] = [],
+    post_init_kwargs: dict[str, object] = {},
+    /,
+    **param_values: object,
+) -> None:
+    """Close equivalent to actual implementation"""
+    self.set_params(**param_values)
+    self.__post_init__(*args, **kwargs)
 ```
+
+**Note however** that if `__post_init__` does not accept positional (_resp._ keyword) arguments, then `post_init_args`(_resp._ `post_init_kwargs`) is removed from `__init__`'s signature. In any case, you can check the signature with `inspect.signature(your_paramclass)`.
 
 Since parameter values are set before `__post_init__` is called, they are accessible when it executes. Note that even if a _paramclass_ does not define `__post_init__`, its bases might, in which case it is used.
 
@@ -237,13 +243,16 @@ Additionally, both `@staticmethod` and `@classmethod` decorators are supported d
 #### Abstract methods
 
 The base `ParamClass` already inherits `ABC` functionalities, so `@abstractmethod` can be used.
+
 ```python
 from abc import abstractmethod
 
 class A(ParamClass):
     @abstractmethod
     def next(self): ...
+
 ```
+
 ```pycon
 >>> A()
 <traceback>

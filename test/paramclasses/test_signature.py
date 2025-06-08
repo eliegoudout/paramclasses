@@ -1,4 +1,4 @@
-"""Test the `__signature__` property.
+"""Test the runtime signature and `__signature__` property.
 
 When dropping 3.12, replace `repr(Signature)` with `Signature.format()`.
 """
