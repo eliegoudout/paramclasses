@@ -82,7 +82,7 @@ def _run_once(reason: str) -> Callable[[Callable[_P, _T]], Callable[_P, _T]]:
             try:
                 del flag
             except NameError:
-                msg = f"Function '{func.__name__}' should only be called once: {reason}"
+                msg = f"Function {func.__name__!r} should only be called once: {reason}"
                 raise RuntimeError(msg) from None
             return func(*args, **kwargs)
 
@@ -117,21 +117,21 @@ def _assert_unprotected(attr: str, protected: dict[str, type | None]) -> None:
     """Assert that `attr not in protected`."""
     if attr in protected:
         owner = protected[attr]
-        msg = f"'{attr}' is protected by {_repr_owner(owner)}"
+        msg = f"{attr!r} is protected by {_repr_owner(owner)}"
         raise ProtectedError(msg)
 
 
 def _assert_valid_param(attr: str) -> None:
     """Assert that `attr` is authorized as parameter name."""
     if attr.startswith("__") and attr.endswith("__"):
-        msg = f"Dunder parameters ('{attr}') are forbidden"
+        msg = f"Dunder parameters ({attr!r}) are forbidden"
         raise AttributeError(msg)
 
 
 def _dont_assign_missing(attr: str, val: object) -> None:
     """Forbid assigning the special 'missing value'."""
     if val is MISSING:
-        msg = f"Assigning special missing value (attribute '{attr}') is forbidden"
+        msg = f"Assigning special missing value (attribute {attr!r}) is forbidden"
         raise ValueError(msg)
 
 
@@ -141,7 +141,7 @@ def _repr_owner(*bases: type | None) -> str:
     def _mono_repr(cls: type | None) -> str:
         if cls is None:
             return "<paramclasses root protection>"
-        return f"'{cls.__name__}'"
+        return f"{cls.__name__!r}"
 
     return ", ".join(sorted(map(_mono_repr, bases)))
 
@@ -181,7 +181,7 @@ def _update_while_checking_consistency(orig: dict, update: MappingProxyType) -> 
             orig[attr] = val
             continue
         if (previous := orig[attr]) is not val:
-            msg = f"'{attr}' protection conflict: {_repr_owner(val, previous)}"
+            msg = f"{attr!r} protection conflict: {_repr_owner(val, previous)}"
             raise ProtectedError(msg)
 
 
@@ -235,7 +235,7 @@ def _check_valid_mro(tail: tuple[type, ...], bases: tuple[type, ...]) -> None:
         msg = (
             "Invalid method resolution order (MRO) for bases "
             f"{', '.join(base.__name__ for base in bases)}: nonparamclass "
-            f"'{cls1.__name__}' would come before paramclass '{cls2.__name__}'"
+            f"{cls1.__name__!r} would come before paramclass {cls2.__name__!r}"
         )
         raise TypeError(msg)
 
@@ -338,7 +338,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
                 if attr in protected_special:
                     continue
                 if attr in protected and (owner := protected[attr]) is not base:
-                    msg = f"'{attr}' protection conflict: {_repr_owner(base, owner)}"
+                    msg = f"{attr!r} protection conflict: {_repr_owner(base, owner)}"
                     raise ProtectedError(msg)
 
         # # Namespace: handle slots, protect, store parameters
@@ -348,7 +348,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         protect_then_slot = set(protected).intersection(slots)
         if protect_then_slot:
             msg = "Cannot slot the following protected attributes: " + ", ".join(
-                f"'{attr}' (from {_repr_owner(protected[attr])})"
+                f"{attr!r} (from {_repr_owner(protected[attr])})"
                 for attr in sorted(protect_then_slot)  # sort for pytest output
             )
             raise ProtectedError(msg)
@@ -406,7 +406,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
                 return vars_base[attr]
 
         # Not found
-        msg = f"type object '{cls.__name__}' has no attribute '{attr}'"
+        msg = f"type object {cls.__name__!r} has no attribute {attr!r}"
         raise AttributeError(msg)
 
     def __setattr__(cls, attr: str, val_potentially_protected: object) -> None:
@@ -416,7 +416,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         _dont_assign_missing(attr, val)
         if was_protected:
             warn(
-                f"Cannot protect attribute '{attr}' after class creation. Ignored",
+                f"Cannot protect attribute {attr!r} after class creation. Ignored",
                 stacklevel=2,
             )
         return ABCMeta.__setattr__(cls, attr, val)
@@ -584,7 +584,7 @@ class RawParamClass(metaclass=_MetaParamClass):
                 return vars(base)[attr]
 
         # Not found
-        msg = f"'{cls.__name__}' object has no attribute '{attr}'"
+        msg = f"{cls.__name__!r} object has no attribute {attr!r}"
         raise AttributeError(msg)
 
     @protected
@@ -600,7 +600,7 @@ class RawParamClass(metaclass=_MetaParamClass):
         _dont_assign_missing(attr, val)
         if was_protected:
             warn(
-                f"Cannot protect attribute '{attr}' on instance assignment. Ignored",
+                f"Cannot protect attribute {attr!r} on instance assignment. Ignored",
                 stacklevel=2,
             )
 

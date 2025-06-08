@@ -117,11 +117,11 @@ def assert_same_behaviour() -> Callable:
         for i, collected_op in enumerate(zip(*collected, strict=False)):
             names, exception_flags, blueprints = zip(*collected_op, strict=False)
             ctxt = lambda j: "\n".join([  # noqa: E731
-                f"attr: '{attr}'",
-                f"classes: '{names[j]}', '{names[j + 1]}'",  # noqa: B023
-                f"blueprints: '{blueprints[j]}', '{blueprints[j + 1]}'",  # noqa: B023
+                f"attr: {attr!r}",
+                f"classes: {names[j]!r}, {names[j + 1]!r}",  # noqa: B023
+                f"blueprints: {blueprints[j]!r}, {blueprints[j + 1]!r}",  # noqa: B023
             ])
-            ops_str = f"'{' > '.join(ops[: i + 1])}'"
+            ops_str = f"{' > '.join(ops[: i + 1])!r}"
 
             # All exceptions or all outputs
             are_exceptions = _assert_consistency(
@@ -206,7 +206,7 @@ def attributes_kinds(*filters: str) -> Generator[tuple[str, _AttributeKind], Non
             filtered.has_set.discard(discard)
             filtered.has_delete.discard(discard)
         else:
-            msg = f"Invalid filter '{filter_}'. Consider adding it if necessary"
+            msg = f"Invalid filter {filter_!r}. Consider adding it if necessary"
             raise ValueError(msg)
 
     # General unfiltered constraints (slots, missing, others)
