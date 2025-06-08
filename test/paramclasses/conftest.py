@@ -444,23 +444,17 @@ def parametrize_attr_kind(*filters: str) -> pytest.MarkDecorator:
     return pytest.mark.parametrize(("attr", "kind"), attributes_kinds(*filters), ids=fn)
 
 
-def parametrize_bool(argnames: str, **kwargs: object) -> pytest.MarkDecorator:
+def parametrize_bool(argnames: str) -> pytest.MarkDecorator:
     """Parametrize each argument to be ``True`` or ``False``.
 
     Arguments
     ---------
     argnames: ``str``
         See :func:`pytest.mark.parametrize`.
-    **kwargs: ``object``
-        Passed to :func:`pytest.mark.parametrize`.
 
     """
     n_args = len(argnames.split(","))
-    return pytest.mark.parametrize(
-        argnames,
-        product([True, False], repeat=n_args),
-        **kwargs,
-    )
+    return pytest.mark.parametrize(argnames, product([True, False], repeat=n_args))
 
 
 PostInitType = FunctionType | staticmethod | classmethod

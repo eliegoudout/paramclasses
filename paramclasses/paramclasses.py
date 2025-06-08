@@ -268,8 +268,8 @@ def _post_init_accepts_args_kwargs(cls: type) -> tuple[bool, bool]:
         If :meth:`__post_init__` is not ``Callable``.
 
     """
-    cls_attr = getattr_static(cls, "__post_init__")
-    __post_init__ = cast("Callable", cls.__post_init__)
+    cls_attr = getattr_static(cls, "__post_init__", None)
+    __post_init__ = cast("Callable", getattr(cls, "__post_init__", None))
     if not callable(__post_init__):
         msg = "'__post_init__' attribute must be callable"
         raise TypeError(msg)
@@ -524,6 +524,8 @@ class RawParamClass(metaclass=_MetaParamClass):
         # Sanitize :meth:`__post_init__` arguments
         accepts_args, accepts_kwargs = _post_init_accepts_args_kwargs(cls)
         n_accepted = accepts_args + accepts_kwargs
+        args: list[object]
+        kwargs: dict[str, object]
         if given == 0:
             args, kwargs = [], {}
         elif given > n_accepted:
@@ -533,7 +535,7 @@ class RawParamClass(metaclass=_MetaParamClass):
             )
             raise TypeError(msg)
         elif accepts_args and accepts_kwargs:
-            args, kwargs = args_kwargs if given == n_accepted else (*args_kwargs, {})
+            args, kwargs = args_kwargs if given == n_accepted else (*args_kwargs, {})  # type: ignore[assignment]  # Not statically checked
         elif accepts_args and not accepts_kwargs:
             args, kwargs = *args_kwargs, {}
             if isinstance(args, Mapping):
