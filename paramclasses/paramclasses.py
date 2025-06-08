@@ -12,7 +12,7 @@ __all__ = [
 
 import sys
 from abc import ABCMeta
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import wraps
 from inspect import Parameter, Signature, getattr_static, signature
@@ -250,8 +250,8 @@ def _post_init_accepts_args_kwargs(cls: type) -> tuple[bool, bool]:
     Arguments
     ---------
     cls: ``type``
-        The class to analyze. It must define ``__post_init__``, either
-        a normal method, a ``classmethod`` or a ``staticmethod``.
+        The class to analyze. It must define :meth:`__post_init__`,
+        either a normal method, a ``classmethod`` or a ``staticmethod``.
 
     Returns
     -------
@@ -280,8 +280,22 @@ def _post_init_accepts_args_kwargs(cls: type) -> tuple[bool, bool]:
         parameters.pop(0)
 
     kinds = {parameter.kind for parameter in parameters}
-    accepts_args = bool(kinds & {Parameter.POSITIONAL_OR_KEYWORD, Parameter.POSITIONAL_ONLY, Parameter.VAR_POSITIONAL})
-    accepts_kwargs = bool(kinds & {Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY, Parameter.VAR_KEYWORD})
+    accepts_args = bool(
+        kinds
+        & {
+            Parameter.POSITIONAL_OR_KEYWORD,
+            Parameter.VAR_POSITIONAL,
+            Parameter.POSITIONAL_ONLY,
+        },
+    )
+    accepts_kwargs = bool(
+        kinds
+        & {
+            Parameter.POSITIONAL_OR_KEYWORD,
+            Parameter.KEYWORD_ONLY,
+            Parameter.VAR_KEYWORD,
+        },
+    )
 
     return accepts_args, accepts_kwargs
 
@@ -291,7 +305,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     """Specifically implemented as `RawParamClass`'s metaclass.
 
     Implements class-level protection behaviour and parameters
-    identification, with annotations. Also subclasses `ABCMeta` to be
+    identification, with annotations. Also subclasses ``ABCMeta`` to be
     compatible with its functionality.
     """
 
@@ -300,9 +314,9 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
         It essentially does the following.
             1. Retrieves parameters and protected attributes from bases.
-            2. Inspects `namespace` and its annotations to infer new
+            2. Inspects ``namespace`` and its annotations to infer new
                parameters and newly protected attributes.
-            3. Stores those in `IMPL` class attribute.
+            3. Stores those in ``IMPL`` class attribute.
         """
 
         class Impl(NamedTuple):
@@ -414,7 +428,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
     @property
     def __signature__(cls) -> Signature:
-        # Retrieve ``__post_init__`` signature part
+        # Retrieve :meth:`__post_init__` signature part
         if hasattr(cls, "__post_init__"):
             accept_args, accepts_kwargs = _post_init_accepts_args_kwargs(cls)
         else:
@@ -474,7 +488,7 @@ class RawParamClass(metaclass=_MetaParamClass):
     # ==================================================================================
 
     @protected  # type: ignore[misc]  # mypy is fooled
-    def __init__(
+    def __init__(  # noqa: C901  # I prefer keeping the complexity here
         self,
         *args_kwargs: object,
         **param_values: object,
@@ -498,43 +512,46 @@ class RawParamClass(metaclass=_MetaParamClass):
         for attr, val in param_values.items():
             setattr(self, attr, val)
 
-        # Call ``__post_init__``
+        # Handle case without :meth:`__post_init__`
         cls = type(self)
         given = len(args_kwargs)
         if not hasattr(cls, "__post_init__"):
             if not given:
                 return
-            msg = "Unexpected positional arguments (no `__post_init__` is defined)"
+            msg = "Unexpected positional arguments (no '__post_init__' is defined)"
             raise TypeError(msg)
 
-        # Sanitize ``__post_init__`` arguments
+        # Sanitize :meth:`__post_init__` arguments
         accepts_args, accepts_kwargs = _post_init_accepts_args_kwargs(cls)
+        n_accepted = accepts_args + accepts_kwargs
         if given == 0:
             args, kwargs = [], {}
-        elif given > accepts_args + accepts_kwargs:
+        elif given > n_accepted:
             msg = (
-                f"Invalid arguments. Expected signature: {cls.__name__}{signature(cls)}"
+                "Invalid '__post_init__' arguments. Signature: "
+                f"{cls.__name__}{signature(cls)}"
             )
             raise TypeError(msg)
         elif accepts_args and accepts_kwargs:
-            args, kwargs = args_kwargs if given == 2 else (*args_kwargs, {})
+            args, kwargs = args_kwargs if given == n_accepted else (*args_kwargs, {})
         elif accepts_args and not accepts_kwargs:
             args, kwargs = *args_kwargs, {}
             if isinstance(args, Mapping):
                 msg = (
-                    "Passing `post_init_args` as mapping is not supported. Use "
-                    "`iter(your_mapping)` instead"
+                    "To avoid confusion, passing 'post_init_args' as a mapping is not "
+                    "supported. Use 'iter(your_mapping)' instead"
                 )
                 raise TypeError(msg)
         elif not accepts_args and accepts_kwargs:
             args, kwargs = [], *args_kwargs
-        else:
-            msg = f"Unexpected error while sanitizing `__post_init__` arguments."
+        else:  # pragma: no cover
+            msg = "Unexpected error while sanitizing '__post_init__' arguments"
             raise RuntimeError(msg)
 
+        # Call :meth:`__post_init__`
         out = self.__post_init__(*args, **kwargs)  # type: ignore[operator]  # github.com/eliegoudout/paramclasses/issues/34
         if out is not None:
-            msg = f"`__post_init__` should return `None` (got {out!r})"
+            msg = f"'__post_init__' should return 'None' (got {out!r})"
             raise TypeError(msg)
 
     @protected

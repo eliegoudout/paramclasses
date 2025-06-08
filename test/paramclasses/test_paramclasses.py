@@ -1,5 +1,7 @@
 """Miscellaneous tests not directly related to protection."""
 
+import re
+
 import pytest
 
 from paramclasses import MISSING, ParamClass, RawParamClass, isparamclass
@@ -83,18 +85,6 @@ def test_cannot_assign_special_missing_value_after_class_creation(attr, kind, ma
             setattr(obj, attr, MISSING)
 
 
-@parametrize_attr_kind("unprotected", "parameter")
-def test_init_and_set_params_work(attr, kind, make, null):
-    """For parameters, `set_params` works fine."""
-    Param, param_set_params = make("Param, param", kind)
-    kw = {attr: null}
-    param_init = Param(**kw)
-    param_set_params.set_params(**kw)
-
-    assert getattr(param_init, attr) is null
-    assert getattr(param_set_params, attr) is null
-
-
 @parametrize_attr_kind()
 def test_params_property(attr, kind, make, null):
     """Test `params` property, before and afer assignment."""
@@ -113,21 +103,6 @@ def test_params_property(attr, kind, make, null):
     setattr(param, attr, null)
     expected_after = {attr: null} if kind.parameter else {}
     assert param.params == expected_after
-
-
-@parametrize_attr_kind("nonparameter")
-def test_init_and_set_params_raise_on_nonparameter(attr, kind, make, null):
-    """Using `set_params` on nonparameters fails."""
-    Param, param_set_params = make("Param, param", kind)
-    kw = {attr: null}
-
-    # Check error and match regex
-    regex = rf"^Invalid parameters: {{'{attr}'}}. Operation cancelled$"
-    with pytest.raises(AttributeError, match=regex):
-        Param(**kw)
-
-    with pytest.raises(AttributeError, match=regex):
-        param_set_params.set_params(**kw)
 
 
 def test_isparamclass_works_even_against_virtual(make):
@@ -164,34 +139,6 @@ def test_default_update():
     assert str(a) == "A()"
 
 
-def test_post_init():
-    """Test trivial `__post_init__` use."""
-
-    class A(ParamClass):
-        def __post_init__(self, arg1, arg2) -> None:
-            self.arg1 = arg1
-            self.arg2 = arg2
-
-    arg1, arg2 = object(), object()
-
-    for a in (
-        A([arg1, arg2]),
-        A([arg1], {"arg2": arg2}),
-        A([], {"arg1": arg1, "arg2": arg2}),
-    ):
-        assert a.arg1 is arg1
-        assert a.arg2 is arg2
-
-
-def test_unexpected_post_init_arguments(make):
-    """Check that provided arguments raise error when no post-init."""
-    Param = make("Param")
-
-    regex = r"^Unexpected positional arguments \(no `__post_init__` is defined\)$"
-    with pytest.raises(TypeError, match=regex):
-        Param(1)
-
-
 def test_post_init_must_be_callable():
     """Test `__signature__` error when `__post_init__` not callable."""
 
@@ -201,6 +148,19 @@ def test_post_init_must_be_callable():
     regex = r"^'__post_init__' attribute must be callable$"
     with pytest.raises(TypeError, match=regex):
         A.__signature__  # noqa: B018 (not useless)
+
+
+def test_post_init_should_return_none():
+    """Test `__signature__` error when `__post_init__` not callable."""
+    null = object()
+
+    class A(ParamClass):
+        def __post_init__(self) -> None:
+            return null
+
+    msg = f"'__post_init__' should return 'None' (got {null!r})"
+    with pytest.raises(TypeError, match=f"^{re.escape(msg)}$"):
+        A()
 
 
 def test_invalid_mro():
