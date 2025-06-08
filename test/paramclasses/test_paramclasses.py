@@ -54,8 +54,8 @@ def test_missing_params_property(make):
 
 def test_cannot_define_double_dunder_parameter():
     """Dunder parameters are forbidden."""
-    regex = r"^Dunder parameters \('__'\) are forbidden$"
-    with pytest.raises(AttributeError, match=regex):
+    msg = "Dunder parameters ('__') are forbidden"
+    with pytest.raises(AttributeError, match=f"^{re.escape(msg)}$"):
 
         class A(ParamClass):
             __: ...  # type:ignore[annotation-unchecked]
@@ -63,13 +63,13 @@ def test_cannot_define_double_dunder_parameter():
 
 def test_cannot_assign_special_missing_value_at_class_creation():
     """Missing value can never be assigned."""
-    regex = r"^Assigning special missing value \(attribute 'x'\) is forbidden$"
-    with pytest.raises(ValueError, match=regex):
+    msg = "Assigning special missing value (attribute 'x') is forbidden"
+    with pytest.raises(ValueError, match=f"^{re.escape(msg)}$"):
 
         class A(ParamClass):
             x = MISSING
 
-    with pytest.raises(ValueError, match=regex):
+    with pytest.raises(ValueError, match=f"^{re.escape(msg)}$"):
 
         class B(ParamClass):
             x: ... = MISSING  # type:ignore[annotation-unchecked]
@@ -78,10 +78,10 @@ def test_cannot_assign_special_missing_value_at_class_creation():
 @parametrize_attr_kind("unprotected")
 def test_cannot_assign_special_missing_value_after_class_creation(attr, kind, make):
     """Missing value can never be assigned."""
-    regex = rf"^Assigning special missing value \(attribute '{attr}'\) is forbidden$"
+    msg = f"Assigning special missing value (attribute {attr!r}) is forbidden"
 
     for obj in make("param, Param", kind):
-        with pytest.raises(ValueError, match=regex):
+        with pytest.raises(ValueError, match=f"^{re.escape(msg)}$"):
             setattr(obj, attr, MISSING)
 
 
@@ -145,8 +145,8 @@ def test_post_init_must_be_callable():
     class A(ParamClass):
         __post_init__ = 0
 
-    regex = r"^'__post_init__' attribute must be callable$"
-    with pytest.raises(TypeError, match=regex):
+    msg = "'__post_init__' attribute must be callable"
+    with pytest.raises(TypeError, match=f"^{re.escape(msg)}$"):
         A.__signature__  # noqa: B018 (not useless)
 
 
@@ -170,31 +170,31 @@ def test_invalid_mro():
 
     class B: ...
 
-    regex = (
-        r"^Invalid method resolution order \(MRO\) for bases B, A: nonparamclass 'B'"
-        r" would come before paramclass 'A'$"
+    msg = (
+        "Invalid method resolution order (MRO) for bases B, A: nonparamclass 'B'"
+        " would come before paramclass 'A'"
     )
-    with pytest.raises(TypeError, match=regex):
+    with pytest.raises(TypeError, match=f"^{re.escape(msg)}$"):
 
         class C(B, A): ...
 
 
 def test_cannot_use_metaclass_alone():
     """Forbid simple metaclass without inheritance."""
-    regex = (
-        r"^Function '_skip_mro_check' should only be called once: metaclass"
+    msg = (
+        "Function '_skip_mro_check' should only be called once: metaclass"
         " '_MetaParamClass' should never be explicitly passed except when constructing"
-        r" 'RawParamClass'$"
+        " 'RawParamClass'"
     )
-    with pytest.raises(RuntimeError, match=regex):
+    with pytest.raises(RuntimeError, match=f"^{re.escape(msg)}$"):
 
         class A(metaclass=type(ParamClass)): ...
 
 
 def test_metaclass_requires_inheriting_from_rawparamclass():
     """Check that paramclasses must inherit from RawParamClass."""
-    regex = r"^Paramclasses must always inherit from 'RawParamClass'$"
-    with pytest.raises(TypeError, match=regex):
+    msg = "Paramclasses must always inherit from 'RawParamClass'"
+    with pytest.raises(TypeError, match=f"^{re.escape(msg)}$"):
 
         class A(int, metaclass=type(ParamClass)): ...
 

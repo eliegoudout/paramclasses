@@ -1,5 +1,7 @@
 """Tests directly related to @protected."""
 
+import re
+
 import pytest
 
 from paramclasses import IMPL, ParamClass, ProtectedError, protected
@@ -12,18 +14,18 @@ def test_mcs_is_frozen(assert_set_del_is_protected):
     """
     mcs = type(ParamClass)
     attr = "random_attribute"
-    regex = r"^'_MetaParamClass' attributes are frozen$"
-    assert_set_del_is_protected(mcs, attr, regex)
+    msg = f"{mcs.__name__!r} attributes are frozen"
+    assert_set_del_is_protected(mcs, attr, f"^{re.escape(msg)}$")
 
 
 def test_cannot_subclass_mcs():
     """Cannot subclass `_MetaParamClass' (without altering its meta)."""
     mcs = type(ParamClass)
-    regex = (
-        r"^Function '__new__' should only be called once: '_MetaFrozen' should only"
-        r" construct '_MetaParamClass'$"
+    msg = (
+        f"Function '__new__' should only be called once: {type(mcs).__name__!r} should"
+        f" only construct {mcs.__name__!r}"
     )
-    with pytest.raises(RuntimeError, match=regex):
+    with pytest.raises(RuntimeError, match=f"^{re.escape(msg)}$"):
 
         class Sub(mcs): ...
 
@@ -42,8 +44,8 @@ def test_multiple_protection():
 
 def test_simple_protection_inheritance():
     """Subclass cannot override protected."""
-    regex = r"^'params' is protected by 'ParamClass'$"
-    with pytest.raises(ProtectedError, match=regex):
+    msg = "'params' is protected by 'ParamClass'"
+    with pytest.raises(ProtectedError, match=f"^{re.escape(msg)}$"):
 
         class A(ParamClass):
             params = 0
@@ -66,8 +68,8 @@ def test_multiple_inheritance_consistent_protection():
         class D(A, BC): ...
 
         # Incoherent protection order
-        regex = rf"^'x' protection conflict: 'A', '{BC.__name__}'$"
-        with pytest.raises(ProtectedError, match=regex):
+        msg = f"'x' protection conflict: 'A', {BC.__name__!r}"
+        with pytest.raises(ProtectedError, match=f"^{re.escape(msg)}$"):
 
             class D(BC, A): ...
 
@@ -81,8 +83,8 @@ def test_multiple_inheritance_protection_conflict():
     class B(ParamClass):
         x = protected(0)
 
-    regex = "^'x' protection conflict: 'A', 'B'$"
-    with pytest.raises(ProtectedError, match=regex):
+    msg = "'x' protection conflict: 'A', 'B'"
+    with pytest.raises(ProtectedError, match=f"^{re.escape(msg)}$"):
 
         class C(A, B): ...
 
@@ -105,17 +107,17 @@ def test_multiple_inheritance_diamond_is_fine():
 
 def test_cannot_slot_previously_protected():
     """Cannot slot previously protected attribute."""
-    regex = (
-        rf"^Cannot slot the following protected attributes: '{IMPL}' \(from "
-        r"<paramclasses root protection>\)$"
+    msg = (
+        f"Cannot slot the following protected attributes: {IMPL!r} (from "
+        "<paramclasses root protection>)"
     )
-    with pytest.raises(ProtectedError, match=regex):
+    with pytest.raises(ProtectedError, match=f"^{re.escape(msg)}$"):
 
         class A(ParamClass):
             __slots__ = (IMPL,)
 
     # Not necessarily given as iterable of strings
-    with pytest.raises(ProtectedError, match=regex):
+    with pytest.raises(ProtectedError, match=f"^{re.escape(msg)}$"):
 
         class A(ParamClass):
             __slots__ = IMPL
@@ -127,15 +129,15 @@ def test_post_creation_protection():
     class A(ParamClass): ...
 
     # Class-level
-    regex = "^Cannot protect attribute 'x' after class creation. Ignored$"
-    with pytest.warns(UserWarning, match=regex):
+    msg = "Cannot protect attribute 'x' after class creation. Ignored"
+    with pytest.warns(UserWarning, match=f"^{re.escape(msg)}$"):
         A.x = protected(0)
     assert A.x == 0
 
     # Instance-level
     a = A()
-    regex = "^Cannot protect attribute 'x' on instance assignment. Ignored$"
-    with pytest.warns(UserWarning, match=regex):
+    msg = "Cannot protect attribute 'x' on instance assignment. Ignored"
+    with pytest.warns(UserWarning, match=f"^{re.escape(msg)}$"):
         a.x = protected(1)
     assert a.x == 1
 
@@ -147,8 +149,8 @@ def test_dict_is_protected():
 
 def test_cannot_turn_previously_protected_into_param():
     """Cannot make non-param protected into parameter."""
-    regex = "^'params' is protected by 'ParamClass'$"
-    with pytest.raises(ProtectedError, match=regex):
+    msg = "'params' is protected by 'ParamClass'"
+    with pytest.raises(ProtectedError, match=f"^{re.escape(msg)}$"):
 
         class A(ParamClass):
             params: dict[str, object]  # type:ignore[annotation-unchecked]

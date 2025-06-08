@@ -31,12 +31,11 @@ def test_signature_call_and_set_params_on_nonparameter(attr, kind, make, null):
     Param, param_set_params = make("Param, param", kind)
     kw = {attr: null}
 
-    # Check error and match regex
-    regex = rf"^Invalid parameters: {{'{attr}'}}. Operation cancelled$"
-    with pytest.raises(AttributeError, match=regex):
+    msg = f"Invalid parameters: { {attr} }. Operation cancelled"
+    with pytest.raises(AttributeError, match=f"^{re.escape(msg)}$"):
         Param(**kw)
 
-    with pytest.raises(AttributeError, match=regex):
+    with pytest.raises(AttributeError, match=f"^{re.escape(msg)}$"):
         param_set_params.set_params(**kw)
 
 
@@ -44,8 +43,8 @@ def test_signature_call_no_post_init(make):
     """Check that provided arguments raise error when no post-init."""
     Param = make("Param")
 
-    regex = r"^Unexpected positional arguments \(no '__post_init__' is defined\)$"
-    with pytest.raises(TypeError, match=regex):
+    msg = "Unexpected positional arguments (no '__post_init__' is defined)"
+    with pytest.raises(TypeError, match=f"^{re.escape(msg)}$"):
         Param(None)
 
 
@@ -124,11 +123,11 @@ def test_signature_call_too_many_arguments(
     accepts_kwargs = pos_or_kw or kw_only or var_kw
     n_expexcted = accepts_args + accepts_kwargs
 
-    regex = (
-        f"^Invalid '__post_init__' arguments. Signature: {ParamWithPostInit.__name__}"
-        f"{re.escape(str(signature(ParamWithPostInit)))}$"
+    msg = (
+        f"Invalid '__post_init__' arguments. Signature: {ParamWithPostInit.__name__}"
+        f"{signature(ParamWithPostInit)}"
     )
-    with pytest.raises(TypeError, match=regex):
+    with pytest.raises(TypeError, match=f"^{re.escape(msg)}$"):
         ParamWithPostInit(*range(n_expexcted + 1))
 
 

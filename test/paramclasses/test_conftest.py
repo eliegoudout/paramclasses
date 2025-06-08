@@ -1,5 +1,7 @@
 """Test some nontrivial fixtures."""
 
+import re
+
 import pytest
 
 from .conftest import attributes_kinds, kinds
@@ -73,15 +75,15 @@ def test_attributes_kinds_num_results():
 def test_attributes_kinds_raises_when_empty():
     """Raises `AttributeError` on zero match."""
     filters = ("parameter", "nonparameter")
-    regex = r"^No factory attribute matches \('parameter', 'nonparameter'\)$"
-    with pytest.raises(ValueError, match=regex):
+    msg = f"No factory attribute matches {filters}"
+    with pytest.raises(ValueError, match=f"^{re.escape(msg)}$"):
         next(attributes_kinds(*filters))
 
 
 def test_attributes_kinds_raises_unknown_filter():
     """Raises `AttributeError` on zero match."""
-    regex = r"^Invalid filter 'unknown'. Consider adding it if necessary$"
-    with pytest.raises(ValueError, match=regex):
+    msg = "Invalid filter 'unknown'. Consider adding it if necessary"
+    with pytest.raises(ValueError, match=f"^{re.escape(msg)}$"):
         next(attributes_kinds("unknown"))
 
 
