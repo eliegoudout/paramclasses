@@ -33,6 +33,7 @@ dealing with multiple degree of freedom:
 Only simple inheritance is tested here.
 """
 
+import re
 import sys
 
 import pytest
@@ -53,9 +54,9 @@ def test_behaviour_set_del_protected_class_and_instances(
         "Param, param, param_fill, ParamChild, paramchild, paramchild_fill",
         kind,
     )
-    regex = f"^'{attr}' is protected by '{objs[0].__name__}'"
+    msg = f"{attr!r} is protected by {objs[0].__name__!r}"
     for obj in objs:
-        assert_set_del_is_protected(obj, attr, regex)
+        assert_set_del_is_protected(obj, attr, f"^{re.escape(msg)}$")
 
 
 # ======================================================================================
@@ -236,14 +237,14 @@ def test_behaviour_get_parameter_missing(attr, kind, make, null):
 
     # Class
     for cls in (Param, ParamChild):
-        regex = f"^type object '{cls.__name__}' has no attribute '{attr}'$"
-        with pytest.raises(AttributeError, match=regex):
+        msg = f"type object {cls.__name__!r} has no attribute {attr!r}"
+        with pytest.raises(AttributeError, match=f"^{re.escape(msg)}$"):
             getattr(cls, attr)
 
     # Empty instance
     for obj in (param, paramchild):
-        regex = f"^'{type(obj).__name__}' object has no attribute '{attr}'$"
-        with pytest.raises(AttributeError, match=regex):
+        msg = f"{type(obj).__name__!r} object has no attribute {attr!r}"
+        with pytest.raises(AttributeError, match=f"^{re.escape(msg)}$"):
             getattr(obj, attr)
 
     # Filled instance
@@ -277,9 +278,9 @@ def test_delete_behaviour_unprotected_parameter_class_level(attr, kind, make):
         old = sys.version_info < (3, 11)
         prefix = "" if old else f"type object '{cls.__name__}' has no attribute '"
         suffix = "" if old else "'"
-        regex = f"^{prefix}{attr}{suffix}$"
+        msg = f"{prefix}{attr}{suffix}"
 
-        with pytest.raises(AttributeError, match=regex):
+        with pytest.raises(AttributeError, match=f"^{re.escape(msg)}$"):
             delattr(cls, attr)
 
 

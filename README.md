@@ -1,5 +1,5 @@
 ![OS Independant](https://img.shields.io/badge/OS_Independant-%E2%9C%93-blue)
-[![python versions](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13%20|%203.14.0a6-blue)](https://devguide.python.org/versions/)
+[![python versions](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13%20|%203.14.0b1-blue)](https://devguide.python.org/versions/)
 [![license MIT](https://img.shields.io/github/license/eliegoudout/paramclasses)](https://opensource.org/licenses/MIT)
 [![pypi](https://img.shields.io/pypi/v/paramclasses)](https://pypi.org/project/paramclasses/)
 [![pipeline status](https://github.com/eliegoudout/paramclasses/actions/workflows/ci.yml/badge.svg)](https://github.com/eliegoudout/paramclasses/actions)
@@ -71,7 +71,7 @@ Note that the protection provided by _paramclasses_ is very robust for **practic
 
 ### Defining a _paramclass_
 
-A _paramclass_ is simply defined by subclassing `ParamClass` directly or another _paramclass_. Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), **parameters** are identified as **any annotated attribute** and instanciation logic is automatically built-in -- though it can be [extended](#instantiation-logic-with-__post_init__). In our context, "default" means the current class value, which may change after the instanciation of an object.
+A _paramclass_ is simply defined by subclassing `ParamClass` directly or another _paramclass_. Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), **parameters** are identified as **any annotated attribute** and instantiation logic is automatically built-in -- though it can be [extended](#instantiation-logic-with-__post_init__). In our context, "default" means the current class value, which may change after the instantiation of an object.
 ```python
 from paramclasses import ParamClass
 
@@ -214,19 +214,25 @@ is triggered. For example, it can be used to `unfit` and estimator on specific m
 
 #### Instantiation logic with `__post_init__`
 
-Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), a `__post_init__` method can be defined to complete instantiation after the initial setting of parameter values. It must have signature
-```python
-def __post_init__(self, *args: object, **kwargs: object) -> None
-```
-and is called as follows by `__init__`.
-```python
-# Close equivalent to actual implementation
-@protected
-def __init__(self, args: list[object] = [], kwargs: dict[str, object] = {}, /, **param_values: object) -> None:
-        self.set_params(**param_values)
-        self.__post_init__(*args, **kwargs)
+Similarly to [dataclasses](https://docs.python.org/3/library/dataclasses.html), a `__post_init__` method can be defined to complete instantiation after the initial setting of parameter values. It must **always** return `None`.
 
+In general, it as called as follows by `__init__`.
+
+```python
+@protected
+def __init__(
+    self,
+    post_init_args: list[object] = [],
+    post_init_kwargs: dict[str, object] = {},
+    /,
+    **param_values: object,
+) -> None:
+    """Close equivalent to actual implementation"""
+    self.set_params(**param_values)
+    self.__post_init__(*args, **kwargs)
 ```
+
+**Note however** that if `__post_init__` does not accept positional (_resp._ keyword) arguments, then `post_init_args`(_resp._ `post_init_kwargs`) is removed from `__init__`'s signature. In any case, you can check the signature with `inspect.signature(your_paramclass)`.
 
 Since parameter values are set before `__post_init__` is called, they are accessible when it executes. Note that even if a _paramclass_ does not define `__post_init__`, its bases might, in which case it is used.
 
@@ -237,13 +243,16 @@ Additionally, both `@staticmethod` and `@classmethod` decorators are supported d
 #### Abstract methods
 
 The base `ParamClass` already inherits `ABC` functionalities, so `@abstractmethod` can be used.
+
 ```python
 from abc import abstractmethod
 
 class A(ParamClass):
     @abstractmethod
     def next(self): ...
+
 ```
+
 ```pycon
 >>> A()
 <traceback>
@@ -449,12 +458,9 @@ There is no such thing as "perfect attribute protection" in Python. As such `Par
 
 ### Type checkers
 
-The `@protected` decorator is not acting in the usual sense, as it is a simple wrapper meant to be detected and unwrapped by the metaclass constructing _paramclasses_. Consequently, type checkers such as [mypy](https://mypy-lang.org/) may be confused. If necessary, we recommend locally disabling type checking with the following comment -- and the appropriate [error-code](https://mypy.readthedocs.io/en/stable/error_codes.html).
-```python
-@protected  # type: ignore[error-code]  # mypy is fooled
-def my_protected_method(self):
-```
-It is not ideal and _may_ be fixed in future updates.
+There are currently some [known issues](https://github.com/eliegoudout/paramclasses/issues/34#issuecomment-2918905520) regarding static type checking. The implementation of a `mypy` plugin may solve these in a *not-so-far* future. In the mean time, it is advised to check the link to understand false positives **and negatives** that may occur.
+
+Any contribution regarding this fix is very welcome!
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
