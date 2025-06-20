@@ -1,3 +1,4 @@
+"""Test correct typing behaviour using our ``mypy/plugin.py``."""
 
 import pytest
 
@@ -5,8 +6,9 @@ from paramclasses import ParamClass, protected
 
 
 @pytest.mark.mypy_testing
-def test_a():
+def test_typing():
     """Test identified cases (no test for now)."""
+
     class A(ParamClass):
         x1: int = 0
         x2: int = protected(0)  # Should PASS
