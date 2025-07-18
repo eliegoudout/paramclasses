@@ -1,5 +1,7 @@
 """Easy ways of breaking the potection."""
 
+import re
+
 import pytest
 
 from paramclasses import IMPL, ParamClass, ProtectedError, protected
@@ -52,7 +54,7 @@ def test_modify_mappingproxy(monkeypatch):
     """
     m = monkeypatch
 
-    class Exploit:
+    class Exploit:  # noqa: PLW1641 (no __hash__)
         def __eq__(self, other: dict) -> None:  # type:ignore[override]
             m.delitem(other, "params")
 
@@ -96,12 +98,12 @@ def test_use_type_methods_directly(null):
 
     # Protection works
     assert A.x is null
-    regex = r"^'x' is protected by 'A'$"
-    with pytest.raises(ProtectedError, match=regex):
+    msg = "'x' is protected by 'A'"
+    with pytest.raises(ProtectedError, match=f"^{re.escape(msg)}$"):
         del A.x
 
     # Delete `A.x` despite protection
     type.__delattr__(A, "x")
-    regex = r"^type object 'A' has no attribute 'x'$"
-    with pytest.raises(AttributeError, match=regex):
+    msg = "type object 'A' has no attribute 'x'"
+    with pytest.raises(AttributeError, match=f"^{re.escape(msg)}$"):
         A.x  # noqa: B018 (not "useless")
