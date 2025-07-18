@@ -158,7 +158,7 @@ def _get_namespace_annotations(
     if "__annotations__" in namespace:  # from __future__ import annotations
         return cast("dict[str, object]", namespace["__annotations__"])
 
-    from annotationlib import (  # type: ignore[import-not-found]
+    from annotationlib import (  # type: ignore[import-not-found]  # noqa: PLC0415 (import top-level)
         Format,
         call_annotate_function,
         get_annotate_from_class_namespace,

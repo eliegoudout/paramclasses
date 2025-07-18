@@ -54,7 +54,7 @@ def test_modify_mappingproxy(monkeypatch):
     """
     m = monkeypatch
 
-    class Exploit:
+    class Exploit:  # noqa: PLW1641 (no __hash__)
         def __eq__(self, other: dict) -> None:  # type:ignore[override]
             m.delitem(other, "params")
 
