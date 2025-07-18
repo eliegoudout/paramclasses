@@ -535,9 +535,9 @@ class RawParamClass(metaclass=_MetaParamClass):
             )
             raise TypeError(msg)
         elif accepts_args and accepts_kwargs:
-            args, kwargs = args_kwargs if given == n_accepted else (*args_kwargs, {})  # type: ignore[assignment]  # Not statically checked
+            args, kwargs = args_kwargs if given == n_accepted else (*args_kwargs, {})  # type: ignore[assignment]
         elif accepts_args and not accepts_kwargs:
-            args, kwargs = *args_kwargs, {}
+            args, kwargs = *args_kwargs, {}  # type: ignore[assignment]
             if isinstance(args, Mapping):
                 msg = (
                     "To avoid confusion, passing 'post_init_args' as a mapping is not "
@@ -545,7 +545,7 @@ class RawParamClass(metaclass=_MetaParamClass):
                 )
                 raise TypeError(msg)
         elif not accepts_args and accepts_kwargs:
-            args, kwargs = [], *args_kwargs
+            args, kwargs = [], *args_kwargs  # type: ignore[assignment]
         else:  # pragma: no cover
             msg = "Unexpected error while sanitizing '__post_init__' arguments"
             raise RuntimeError(msg)
