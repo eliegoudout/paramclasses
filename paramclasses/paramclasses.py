@@ -12,7 +12,7 @@ __all__ = [
 
 import sys
 from abc import ABCMeta
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import wraps
 from inspect import Parameter, Signature, getattr_static, signature
@@ -82,7 +82,7 @@ def _run_once(reason: str) -> Callable[[Callable[_P, _T]], Callable[_P, _T]]:
             try:
                 del flag
             except NameError:
-                msg = f"Function '{func.__name__}' should only be called once: {reason}"
+                msg = f"Function {func.__name__!r} should only be called once: {reason}"
                 raise RuntimeError(msg) from None
             return func(*args, **kwargs)
 
@@ -117,21 +117,21 @@ def _assert_unprotected(attr: str, protected: dict[str, type | None]) -> None:
     """Assert that `attr not in protected`."""
     if attr in protected:
         owner = protected[attr]
-        msg = f"'{attr}' is protected by {_repr_owner(owner)}"
+        msg = f"{attr!r} is protected by {_repr_owner(owner)}"
         raise ProtectedError(msg)
 
 
 def _assert_valid_param(attr: str) -> None:
     """Assert that `attr` is authorized as parameter name."""
     if attr.startswith("__") and attr.endswith("__"):
-        msg = f"Dunder parameters ('{attr}') are forbidden"
+        msg = f"Dunder parameters ({attr!r}) are forbidden"
         raise AttributeError(msg)
 
 
 def _dont_assign_missing(attr: str, val: object) -> None:
     """Forbid assigning the special 'missing value'."""
     if val is MISSING:
-        msg = f"Assigning special missing value (attribute '{attr}') is forbidden"
+        msg = f"Assigning special missing value (attribute {attr!r}) is forbidden"
         raise ValueError(msg)
 
 
@@ -141,7 +141,7 @@ def _repr_owner(*bases: type | None) -> str:
     def _mono_repr(cls: type | None) -> str:
         if cls is None:
             return "<paramclasses root protection>"
-        return f"'{cls.__name__}'"
+        return f"{cls.__name__!r}"
 
     return ", ".join(sorted(map(_mono_repr, bases)))
 
@@ -158,7 +158,7 @@ def _get_namespace_annotations(
     if "__annotations__" in namespace:  # from __future__ import annotations
         return cast("dict[str, object]", namespace["__annotations__"])
 
-    from annotationlib import (  # type: ignore[import-not-found]
+    from annotationlib import (  # type: ignore[import-not-found]  # noqa: PLC0415 (import top-level)
         Format,
         call_annotate_function,
         get_annotate_from_class_namespace,
@@ -181,7 +181,7 @@ def _update_while_checking_consistency(orig: dict, update: MappingProxyType) -> 
             orig[attr] = val
             continue
         if (previous := orig[attr]) is not val:
-            msg = f"'{attr}' protection conflict: {_repr_owner(val, previous)}"
+            msg = f"{attr!r} protection conflict: {_repr_owner(val, previous)}"
             raise ProtectedError(msg)
 
 
@@ -235,7 +235,7 @@ def _check_valid_mro(tail: tuple[type, ...], bases: tuple[type, ...]) -> None:
         msg = (
             "Invalid method resolution order (MRO) for bases "
             f"{', '.join(base.__name__ for base in bases)}: nonparamclass "
-            f"'{cls1.__name__}' would come before paramclass '{cls2.__name__}'"
+            f"{cls1.__name__!r} would come before paramclass {cls2.__name__!r}"
         )
         raise TypeError(msg)
 
@@ -244,12 +244,68 @@ def _check_valid_mro(tail: tuple[type, ...], bases: tuple[type, ...]) -> None:
         raise TypeError(msg)
 
 
+def _post_init_accepts_args_kwargs(cls: type) -> tuple[bool, bool]:
+    """Whether :meth:`__post_init__` method accepts args and/or kwargs.
+
+    Arguments
+    ---------
+    cls: ``type``
+        The class to analyze. It must define :meth:`__post_init__`,
+        either a normal method, a ``classmethod`` or a ``staticmethod``.
+
+    Returns
+    -------
+    accepts_args: ``bool``
+        Explicit.
+    accepts_kwargs: ``bool``
+        Explicit.
+
+    Raises
+    ------
+    ValueError:
+        if ``cls`` has no attribute ``__post_init__``.
+    TypeError:
+        If :meth:`__post_init__` is not ``Callable``.
+
+    """
+    cls_attr = getattr_static(cls, "__post_init__", None)
+    __post_init__ = cast("Callable", getattr(cls, "__post_init__", None))
+    if not callable(__post_init__):
+        msg = "'__post_init__' attribute must be callable"
+        raise TypeError(msg)
+
+    raw_signature = signature(__post_init__)
+    parameters = list(raw_signature.parameters.values())
+    if not isinstance(cls_attr, (classmethod, staticmethod)):
+        parameters.pop(0)
+
+    kinds = {parameter.kind for parameter in parameters}
+    accepts_args = bool(
+        kinds
+        & {
+            Parameter.POSITIONAL_OR_KEYWORD,
+            Parameter.VAR_POSITIONAL,
+            Parameter.POSITIONAL_ONLY,
+        },
+    )
+    accepts_kwargs = bool(
+        kinds
+        & {
+            Parameter.POSITIONAL_OR_KEYWORD,
+            Parameter.KEYWORD_ONLY,
+            Parameter.VAR_KEYWORD,
+        },
+    )
+
+    return accepts_args, accepts_kwargs
+
+
 @final
 class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
     """Specifically implemented as `RawParamClass`'s metaclass.
 
     Implements class-level protection behaviour and parameters
-    identification, with annotations. Also subclasses `ABCMeta` to be
+    identification, with annotations. Also subclasses ``ABCMeta`` to be
     compatible with its functionality.
     """
 
@@ -258,9 +314,9 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
         It essentially does the following.
             1. Retrieves parameters and protected attributes from bases.
-            2. Inspects `namespace` and its annotations to infer new
+            2. Inspects ``namespace`` and its annotations to infer new
                parameters and newly protected attributes.
-            3. Stores those in `IMPL` class attribute.
+            3. Stores those in ``IMPL`` class attribute.
         """
 
         class Impl(NamedTuple):
@@ -282,7 +338,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
                 if attr in protected_special:
                     continue
                 if attr in protected and (owner := protected[attr]) is not base:
-                    msg = f"'{attr}' protection conflict: {_repr_owner(base, owner)}"
+                    msg = f"{attr!r} protection conflict: {_repr_owner(base, owner)}"
                     raise ProtectedError(msg)
 
         # # Namespace: handle slots, protect, store parameters
@@ -292,7 +348,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         protect_then_slot = set(protected).intersection(slots)
         if protect_then_slot:
             msg = "Cannot slot the following protected attributes: " + ", ".join(
-                f"'{attr}' (from {_repr_owner(protected[attr])})"
+                f"{attr!r} (from {_repr_owner(protected[attr])})"
                 for attr in sorted(protect_then_slot)  # sort for pytest output
             )
             raise ProtectedError(msg)
@@ -350,7 +406,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
                 return vars_base[attr]
 
         # Not found
-        msg = f"type object '{cls.__name__}' has no attribute '{attr}'"
+        msg = f"type object {cls.__name__!r} has no attribute {attr!r}"
         raise AttributeError(msg)
 
     def __setattr__(cls, attr: str, val_potentially_protected: object) -> None:
@@ -360,7 +416,7 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
         _dont_assign_missing(attr, val)
         if was_protected:
             warn(
-                f"Cannot protect attribute '{attr}' after class creation. Ignored",
+                f"Cannot protect attribute {attr!r} after class creation. Ignored",
                 stacklevel=2,
             )
         return ABCMeta.__setattr__(cls, attr, val)
@@ -372,43 +428,18 @@ class _MetaParamClass(ABCMeta, metaclass=_MetaFrozen):
 
     @property
     def __signature__(cls) -> Signature:
-        # Include `__post_init__` signature, if defined. Specifically,
-        # adds a positional-only `post_init_args` (resp.
-        # `post_init_kwargs`) if `__post_init__` accepts any positional
-        # (resp. keyword) argument. Handles @staticmethod and
-        # @classmethod.
-        post_init = []
-        cls_attr = getattr_static(cls, "__post_init__", None)
-        if cls_attr is None:
-            post_init_parameters = []
+        # Retrieve :meth:`__post_init__` signature part
+        if hasattr(cls, "__post_init__"):
+            accept_args, accepts_kwargs = _post_init_accepts_args_kwargs(cls)
         else:
-            __post_init__ = cast("Callable", cls.__post_init__)
-            if not callable(__post_init__):
-                msg = "'__post_init__' attribute must be callable"
-                raise TypeError(msg)
+            accept_args, accepts_kwargs = False, False
 
-            post_init_raw_signature = signature(__post_init__)
-            post_init_parameters = list(post_init_raw_signature.parameters.values())
-            if not isinstance(cls_attr, (classmethod, staticmethod)):
-                post_init_parameters.pop(0)
-
-        kinds = {parameter.kind for parameter in post_init_parameters}
-        # If `__post_init__` accepts positional arguments
-        if kinds & {
-            Parameter.POSITIONAL_OR_KEYWORD,
-            Parameter.POSITIONAL_ONLY,
-            Parameter.VAR_POSITIONAL,
-        }:
+        post_init = []
+        if accept_args:
             post_init.append(
                 Parameter("post_init_args", Parameter.POSITIONAL_ONLY, default=[]),
             )
-
-        # If `__post_init__` accepts keyword arguments
-        if kinds & {
-            Parameter.POSITIONAL_OR_KEYWORD,
-            Parameter.KEYWORD_ONLY,
-            Parameter.VAR_KEYWORD,
-        }:
+        if accepts_kwargs:
             post_init.append(
                 Parameter("post_init_kwargs", Parameter.POSITIONAL_ONLY, default={}),
             )
@@ -457,32 +488,21 @@ class RawParamClass(metaclass=_MetaParamClass):
     # ==================================================================================
 
     @protected  # type: ignore[misc]  # mypy is fooled
-    def __init__(
+    def __init__(  # noqa: C901  # I prefer keeping the complexity here
         self,
-        args: list[object] | None = None,
-        kwargs: dict[str, object] | None = None,
-        /,
+        *args_kwargs: object,
         **param_values: object,
     ) -> None:
-        """Set parameters and call `__post_init__` if defined.
+        """Set parameters and call ``__post_init__`` if defined.
 
-        Arguments:
-            args (list[object] | None): If not `None`, unpacked as
-                positional arguments for `__post_init__` -- if not
-                defined, raises `TypeError`.
-            kwargs (dict[str, object] | None): If not `None`, unpacked
-                as keyword arguments for `__post_init__` -- if not
-                defined, raises `TypeError`.
-            **param_values (object): Assigned parameter values at
-                instantiation.
+        Arguments
+        ---------
+        args_kwargs: ``object``
+            To do.
+        **param_values: ``object``
+            Assigned parameter values at instantiation.
 
         """
-        if not hasattr(self, "__post_init__") and (
-            args is not None or kwargs is not None
-        ):
-            msg = "Unexpected positional arguments (no `__post_init__` is defined)"
-            raise TypeError(msg)
-
         # Set params: KEEP UP-TO-DATE with `ParamClass.set_params`!
         wrong = set(param_values) - set(getattr(self, IMPL).annotations)
         if wrong:
@@ -492,15 +512,49 @@ class RawParamClass(metaclass=_MetaParamClass):
         for attr, val in param_values.items():
             setattr(self, attr, val)
 
-        # Call `__post_init__`
-        if not hasattr(self, "__post_init__"):
-            return
+        # Handle case without :meth:`__post_init__`
+        cls = type(self)
+        given = len(args_kwargs)
+        if not hasattr(cls, "__post_init__"):
+            if not given:
+                return
+            msg = "Unexpected positional arguments (no '__post_init__' is defined)"
+            raise TypeError(msg)
 
-        if args is None:
-            args = []
-        if kwargs is None:
-            kwargs = {}
-        self.__post_init__(*args, **kwargs)  # type: ignore[operator]  # github.com/eliegoudout/paramclasses/issues/34
+        # Sanitize :meth:`__post_init__` arguments
+        accepts_args, accepts_kwargs = _post_init_accepts_args_kwargs(cls)
+        n_accepted = accepts_args + accepts_kwargs
+        args: list[object]
+        kwargs: dict[str, object]
+        if given == 0:
+            args, kwargs = [], {}
+        elif given > n_accepted:
+            msg = (
+                "Invalid '__post_init__' arguments. Signature: "
+                f"{cls.__name__}{signature(cls)}"
+            )
+            raise TypeError(msg)
+        elif accepts_args and accepts_kwargs:
+            args, kwargs = args_kwargs if given == n_accepted else (*args_kwargs, {})  # type: ignore[assignment]
+        elif accepts_args and not accepts_kwargs:
+            args, kwargs = *args_kwargs, {}  # type: ignore[assignment]
+            if isinstance(args, Mapping):
+                msg = (
+                    "To avoid confusion, passing 'post_init_args' as a mapping is not "
+                    "supported. Use 'iter(your_mapping)' instead"
+                )
+                raise TypeError(msg)
+        elif not accepts_args and accepts_kwargs:
+            args, kwargs = [], *args_kwargs  # type: ignore[assignment]
+        else:  # pragma: no cover
+            msg = "Unexpected error while sanitizing '__post_init__' arguments"
+            raise RuntimeError(msg)
+
+        # Call :meth:`__post_init__`
+        out = self.__post_init__(*args, **kwargs)  # type: ignore[operator]  # github.com/eliegoudout/paramclasses/issues/34
+        if out is not None:
+            msg = f"'__post_init__' should return 'None' (got {out!r})"
+            raise TypeError(msg)
 
     @protected
     def __getattribute__(self, attr: str) -> object:  # type: ignore[override]  # mypy is fooled
@@ -532,7 +586,7 @@ class RawParamClass(metaclass=_MetaParamClass):
                 return vars(base)[attr]
 
         # Not found
-        msg = f"'{cls.__name__}' object has no attribute '{attr}'"
+        msg = f"{cls.__name__!r} object has no attribute {attr!r}"
         raise AttributeError(msg)
 
     @protected
@@ -548,7 +602,7 @@ class RawParamClass(metaclass=_MetaParamClass):
         _dont_assign_missing(attr, val)
         if was_protected:
             warn(
-                f"Cannot protect attribute '{attr}' on instance assignment. Ignored",
+                f"Cannot protect attribute {attr!r} on instance assignment. Ignored",
                 stacklevel=2,
             )
 

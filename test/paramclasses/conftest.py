@@ -6,12 +6,12 @@ import inspect
 import re
 from collections.abc import Callable, Generator, Iterable
 from itertools import chain, compress, pairwise, product, repeat
-from types import MappingProxyType
-from typing import Literal, NamedTuple
+from types import FunctionType, MappingProxyType
+from typing import Literal, NamedTuple, cast
 
 import pytest
 
-from paramclasses import ParamClass, ProtectedError, protected
+from paramclasses import ParamClass, ProtectedError, isparamclass, protected
 
 
 @pytest.fixture(scope="session")
@@ -117,11 +117,11 @@ def assert_same_behaviour() -> Callable:
         for i, collected_op in enumerate(zip(*collected, strict=False)):
             names, exception_flags, blueprints = zip(*collected_op, strict=False)
             ctxt = lambda j: "\n".join([  # noqa: E731
-                f"attr: '{attr}'",
-                f"classes: '{names[j]}', '{names[j + 1]}'",  # noqa: B023
-                f"blueprints: '{blueprints[j]}', '{blueprints[j + 1]}'",  # noqa: B023
+                f"attr: {attr!r}",
+                f"classes: {names[j]!r}, {names[j + 1]!r}",  # noqa: B023
+                f"blueprints: {blueprints[j]!r}, {blueprints[j + 1]!r}",  # noqa: B023
             ])
-            ops_str = f"'{' > '.join(ops[: i + 1])}'"
+            ops_str = f"{' > '.join(ops[: i + 1])!r}"
 
             # All exceptions or all outputs
             are_exceptions = _assert_consistency(
@@ -206,7 +206,7 @@ def attributes_kinds(*filters: str) -> Generator[tuple[str, _AttributeKind], Non
             filtered.has_set.discard(discard)
             filtered.has_delete.discard(discard)
         else:
-            msg = f"Invalid filter '{filter_}'. Consider adding it if necessary"
+            msg = f"Invalid filter {filter_!r}. Consider adding it if necessary"
             raise ValueError(msg)
 
     # General unfiltered constraints (slots, missing, others)
@@ -442,3 +442,101 @@ def parametrize_attr_kind(*filters: str) -> pytest.MarkDecorator:
         return attr_or_kind if isinstance(attr_or_kind, str) else ""
 
     return pytest.mark.parametrize(("attr", "kind"), attributes_kinds(*filters), ids=fn)
+
+
+def parametrize_bool(argnames: str) -> pytest.MarkDecorator:
+    """Parametrize each argument to be ``True`` or ``False``.
+
+    Arguments
+    ---------
+    argnames: ``str``
+        See :func:`pytest.mark.parametrize`.
+
+    """
+    n_args = len(argnames.split(","))
+    return pytest.mark.parametrize(argnames, product([True, False], repeat=n_args))
+
+
+PostInitType = FunctionType | staticmethod | classmethod
+
+
+def make_with_post_init(  # noqa: PLR0913
+    *,
+    pos_only: bool,
+    pos_or_kw: bool,
+    var_pos: bool,
+    kw_only: bool,
+    var_kw: bool,
+    kind: Literal["normal", "static", "class"],
+) -> type:
+    """Create a factory paramclass with `__post_init__`.
+
+    Warning
+    -------
+    Uses ``exec`` with controlled ``globals`` and ``locals``.
+
+    Example
+    -------
+    With every type of arguments and ``kind="class"``, the code is
+    ::
+
+        class ParamWithPostInit(ParamClass):
+            @classmethod
+            def __post_init__(cls, pos_only, /, pos_or_kw, *var_pos, kw_only, **var_kw):
+                assert pos_only == "pos_only"
+                assert pos_or_kw == "pos_or_kw"
+                assert var_pos == ("var_pos",)
+                assert kw_only == "kw_only"
+                assert var_kw == {"var_kw": "var_kw"}
+
+    """
+    # Decorator
+    argnames: list[str] = []
+    if kind == "normal":
+        decorator = ""
+        argnames.append("self")
+    elif kind == "static":
+        decorator = "@staticmethod"
+    elif kind == "class":
+        decorator = "@classmethod"
+        argnames.append("cls")
+    else:  # pragma: no cover
+        msg = f"Invalid kind {kind!r}"
+        raise ValueError(msg)
+
+    # Signature and body
+    lines = []
+    if pos_only:
+        argnames.extend(["pos_only", "/"])
+        lines.append('assert pos_only == "pos_only"')
+    if pos_or_kw:
+        argnames.extend(["pos_or_kw"])
+        lines.append('assert pos_or_kw == "pos_or_kw"')
+    if var_pos:
+        argnames.extend(["*var_pos"])
+        lines.append('assert var_pos == ("var_pos",)')
+    if kw_only:
+        argnames.extend(["kw_only"] if var_pos else ["*", "kw_only"])
+        lines.append('assert kw_only == "kw_only"')
+    if var_kw:
+        argnames.extend(["**var_kw"])
+        lines.append('assert var_kw == {"var_kw": "var_kw"}')
+
+    sig = ", ".join(argnames)
+    body = "\n".join(f"        {line}" for line in lines) or "        return"
+
+    # Code
+    code = (
+        "class ParamWithPostInit(ParamClass):\n"
+        f"    {decorator}\n"
+        f"    def __post_init__({sig}):\n"
+        f"{body}\n"
+    )
+
+    # Create
+    container: dict[str, object] = {}
+    exec(code, {"ParamClass": ParamClass}, container)  # noqa: S102  # very controlled use
+    cls = cast("type", container.pop("ParamWithPostInit"))
+    assert isparamclass(cls)
+
+    return cls
