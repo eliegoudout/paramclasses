@@ -11,14 +11,44 @@
 
 # `ParamClass`
 
+A Python library that brings robust attribute protection to parameter-holding classes, making inheritance safer and more predictable.
+
 ```bash
-# Install from PyPI
 pip install paramclasses
+```
+
+## TLDR 🚀
+
+- Like dataclasses, but with protected attributes that can't be accidentally overridden
+- Perfect for building extensible APIs and libraries
+- Runtime protection (no type checker needed)
+- Simple to use - just inherit from `ParamClass` and use `@protected`
+
+```python
+from paramclasses import ParamClass, protected
+
+class BaseEstimator(ParamClass):
+    learning_rate: float = 0.01  # Parameter with default
+    n_iterations: int            # Required parameter
+    
+    @protected  # Can't be overridden by subclasses
+    def fit(self, data):
+        # Your fitting logic here
+        pass
+
+# This will raise ProtectedError - can't override protected method
+class BadEstimator(BaseEstimator):
+    fit = "oops"  # ❌ Raises ProtectedError
+
+# This is fine - proper inheritance
+class GoodEstimator(BaseEstimator):
+    def predict(self, X):  # ✅ Adding new methods is fine
+        return X * 2
 ```
 
 ###### Table of Contents
 
-1. [👩‍🏫 **Rationale**](#1-rationale-)
+1. [🤔 **Why ParamClass?**](#1-why-paramclass-)
 2. [🧐 **Overview**](#2-overview-)
     - [Defining a _paramclass_](#defining-a-paramclass)
     - [Protecting attributes with `@protected`](#protecting-attributes-with-protected)
@@ -42,27 +72,20 @@ pip install paramclasses
 6. [⚖️ **License**](#6-license-%EF%B8%8F)
 
 
-## 1. Rationale 👩‍🏫
+## 1. Why ParamClass? 🤔
 
-##### Parameter-holding classes vs. inheritance...
+Ever tried building a library with inheritance and parameter-holding classes, only to find users accidentally overriding your critical attributes? ParamClass solves this by providing:
 
-For a _parameter_-holding class, like [dataclasses](https://docs.python.org/3/library/dataclasses.html), it would be nice to embark some inherited functionality -- _e.g._ `params` property to access current `(param, value)` pairs, `missing_params` for unassigned parameter keys,... Such inheritance would allow to factor out specialized functionality for context-dependant methods -- _e.g._ `fit`, `reset`, `plot`, etc... However, such subclassing comes with a risk of attributes conflicts, especially for libraries or exposed APIs, when users do not necessarily know every "read-only" (or "**protected**") attributes from base classes.
+- Runtime protection for your critical attributes and methods
+- Clean parameter handling like dataclasses
+- Safe inheritance that prevents accidental overrides
+- Clear error messages when protection is violated
 
-##### Our solution 😌
-
-To solve this problem, we propose a base `ParamClass` and an `@protected` decorator, which robustly protects any target attribute -- not only parameters -- from being accidentally overriden when subclassing, at runtime. If a subclass tries to override an attribute protected by one of its parents, a detailed `ProtectedError` will be raised and class definition will fail.
-
-##### Why not use `@dataclass(frozen=True)` or `typing.final`?
-
-First of all, the `@dataclass(frozen=True)` decorator only applies protection to instances. Besides, it targets all attributes indifferently. Morover, it does not protect against deletion or direct `vars(instance)` manipulation. Finally, protection is not inherited, thus subclasses need to use the decorator again, while being cautious not to silently override previously protected attributes.
-
-The `typing` alternatives [`@final`](https://docs.python.org/3/library/typing.html#typing.final) and [`Final`](https://docs.python.org/3/library/typing.html#typing.Final) are designed for type checkers only, which we do not want to rely on. From python 3.11 onwards, `final` _does_ add a `__final__` flag when possible, but it will not affect immutable objects.
-
-We also mention this [recent PEP draft](https://peps.python.org/pep-0767/) considering attribute-level protection, again for type checkers and without considering subclassing protection.
-
-##### Disclaimer
-
-Note that the protection provided by _paramclasses_ is very robust for **practical use**, but it **should not** be considered a security feature.
+Unlike alternatives like `@dataclass(frozen=True)` or `typing.Final`, ParamClass:
+- Protects specific attributes, not everything
+- Works at the class level, not just instances
+- Provides inheritance-aware protection
+- Doesn't rely on type checkers
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
 
@@ -356,7 +379,7 @@ TypeError: 'list' object cannot be interpreted as an integer
 <bound method cumsum of <__main__.NonParamOperator object at 0x13a10e7a0>>
 ```
 
-Note how `NonParamOperator().op` is a **bound** method. What happened here is that since `np.cumsum` is a data [descriptor](https://docs.python.org/3/howto/descriptor.html) -- like all `function`, `property` or `member_descriptor` objects for example --, the function `np.cumsum(a, axis=None, dtype=None, out=None)` interpreted `NonParamOperator()` to be the array `a`, and `[0, 1, 2]` to be the `axis`.
+Note how `NonParamOperator().op` is a **bound** method. What happened here is that since `np.cumsum` is a data [descriptor](https://docs.python.org/3/howto/descriptor.html#member-objects-and-slots), the function `np.cumsum(a, axis=None, dtype=None, out=None)` interpreted `NonParamOperator()` to be the array `a`, and `[0, 1, 2]` to be the `axis`.
 
 To avoid this kind of surprises we chose, **for parameters only**, to bypass the get/set/delete descriptor-specific behaviours, and treat them as _usual_ attributes. Contrary to [dataclasses](https://docs.python.org/3/library/dataclasses.html), by also bypassing descriptors for set/delete operations, we allow property-valued parameters, for example.
 ```python
