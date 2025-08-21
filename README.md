@@ -54,7 +54,7 @@ To solve this problem, we propose a base `ParamClass` and an `@protected` decora
 
 ##### Why not use `@dataclass(frozen=True)` or `typing.final`?
 
-First of all, the `@dataclass(frozen=True)` decorator only applies protection to instances. Besides, it targets all attributes indifferently. Morover, it does not protect against deletion or direct `vars(instance)` manipulation. Finally, protection is not inherited, thus subclasses need to use the decorator again, while being cautious not to silently override previously protected attributes.
+First of all, the `@dataclass(frozen=True)` decorator only applies protection to instances. Besides, it targets all attributes indifferently. Moreover, it does not protect against deletion or direct `vars(instance)` manipulation. Finally, protection is not inherited, thus subclasses need to use the decorator again, while being cautious not to silently override previously protected attributes.
 
 The `typing` alternatives [`@final`](https://docs.python.org/3/library/typing.html#typing.final) and [`Final`](https://docs.python.org/3/library/typing.html#typing.Final) are designed for type checkers only, which we do not want to rely on. From python 3.11 onwards, `final` _does_ add a `__final__` flag when possible, but it will not affect immutable objects.
 
