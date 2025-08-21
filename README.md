@@ -479,11 +479,11 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 After having installed [uv](https://github.com/astral-sh/uv#readme), you can independently use all of the following without ever worrying about installing python or dependencies, or creating virtual environments.
 ```bash
-uvx ruff check                        # Check linting
-uvx ruff format --diff                # Check formatting
-uv run mypy                           # Run mypy
-uv pip install -e . && uv run pytest  # Run pytest
-uv run python                         # Interactive session in virtual environment
+uvx ruff check          # Check linting
+uvx ruff format --diff  # Check formatting
+uv run mypy             # Run mypy
+uv run pytest           # Run pytest
+uv run python           # Interactive session in virtual environment
 ```
 
 <sup>Back to [Table of Contents](#readme)👆</sup>
