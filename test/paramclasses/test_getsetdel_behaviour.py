@@ -287,8 +287,6 @@ def test_delete_behaviour_unprotected_parameter_class_level(attr, kind, make):
 @parametrize_attr_kind("unprotected", "parameter")
 def test_delete_behaviour_unprotected_parameter_instance_level(attr, kind, make):
     """Always bypasses descriptors."""
-    param, param_fill = make("param, param_fill", kind)
-
     # Empty instance
     for obj in make("param, paramchild", kind):
         with pytest.raises(AttributeError, match=f"^{attr}$"):

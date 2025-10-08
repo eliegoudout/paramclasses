@@ -420,10 +420,7 @@ def make() -> Callable:  # noqa: C901, PLR0915  # Prefer complexity over modular
                 continue
 
             # `target` is an instance
-            target_base, _fill, _ = target.partition("_fill")
             instance = cls()
-
-            # `target` requires filling `vars(instance)`
             if target_is_fill:
                 for attr in attrs:
                     vars(instance)[attr] = fill
