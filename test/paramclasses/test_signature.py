@@ -153,25 +153,19 @@ def test_signature_call_non_unpackable(
 
     accepts_args = pos_only or pos_or_kw or var_pos
     accepts_kwargs = pos_or_kw or kw_only or var_kw
+    # >=3.15.0a2-compatible message (python/cpython/pull/136395)
+    msg = " after * must be an iterable, not NoneType"
 
     # Non-unpackable ``args``
     if accepts_args:
-        msg = (
-            f"{ParamWithPostInit.__name__}.__post_init__() argument after * must be an"
-            " iterable, not NoneType"
-        )
         args_kwargs = [None, {}] if accepts_kwargs else [None]
-        with pytest.raises(TypeError, match=f"^{re.escape(msg)}$"):
+        with pytest.raises(TypeError, match=f"{re.escape(msg)}$"):
             ParamWithPostInit(*args_kwargs)
 
     # Non-unpackable ``kwargs``
     if accepts_kwargs:
-        msg = (
-            f"{ParamWithPostInit.__name__}.__post_init__() argument after ** must be a"
-            " mapping, not NoneType"
-        )
         args_kwargs = [[], None] if accepts_args else [None]
-        with pytest.raises(TypeError, match=f"^{re.escape(msg)}$"):
+        with pytest.raises(TypeError, match=f"{re.escape(msg)}$"):
             ParamWithPostInit(*args_kwargs)
 
 
