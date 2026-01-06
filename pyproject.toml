@@ -31,8 +31,17 @@ Issues = "https://github.com/eliegoudout/paramclasses/issues"
 [dependency-groups]
 dev = [
     "mypy>=1.17.0",
-    "pytest>=8.3.4",
+    "pytest>=7.4.0",
     "pytest-cov>=6.0.0",
+]
+
+[tool.uv]
+# Adjust indirect dependencies lower bound
+constraint-dependencies = [
+    "iniconfig>=1.0.0", # pytest<8.4
+    "packaging>=21.0", # pytest<8.4
+    "pluggy>=1.0.0", # pytest<8.0.0
+    "pyparsing>=2.4.7", # pytest > packaging
 ]
 
 
